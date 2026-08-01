@@ -9,10 +9,13 @@ from app.database import get_db
 from app.core.config import settings
 from app.models.domain import Student, Officer
 from app.models.enums import OfficerRole
-from app.core.dependencies import get_current_officer
+
 
 # Sets up the location wrapper where FastAPI will find incoming bearer headers
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/student/login")
+
+
+#============================= HELPER METHODs TO DECODE JWT PAYLOADS FROM TOKENS ==============================================
 
 async def decode_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
     """Intercepts, parses, and cryptographically verifies an incoming JWT."""
@@ -50,6 +53,12 @@ async def get_current_officer(payload: dict = Depends(decode_token_payload), db:
         raise HTTPException(status_code=404, detail="Administrative record profile not found.")
     return officer
 
+
+
+
+
+
+#=============================================== CURRENTLY ROLE GUARD IS NOT IN USE ================================================
 class RoleGuard:
     """
     Role validation provider wrapper.

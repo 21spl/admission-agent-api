@@ -5,13 +5,16 @@ from app.database import get_db
 from app.models.domain import Student, Officer
 from app.core.security import hash_password, verify_password, create_access_token
 from app.schemas.auth import (
-    StudentRegisterRequest, OfficerRegisterRequest, 
-    LoginRequest, TokenResponse, OfficerCreateByAdminRequest, OfficerProfileResponse
+    StudentRegisterRequest,
+    LoginRequest, TokenResponse, OfficerProfileResponse
 )
 from app.models.enums import OfficerRole
 from app.core.dependencies import RoleGuard
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+#==========================================END POINT FOR STUDENT REGISTRATION =====================================================
 
 @router.post("/student/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register_student(payload: StudentRegisterRequest, db: AsyncSession = Depends(get_db)):
@@ -37,6 +40,8 @@ async def register_student(payload: StudentRegisterRequest, db: AsyncSession = D
     return {"access_token": token, "token_type": "bearer"}
 
 
+#==========================================END POINT FOR STUDENT LOGIN =====================================================
+
 @router.post("/student/login", response_model=TokenResponse)
 async def login_student(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Authenticates student login credentials and returns an Access Token."""
@@ -50,53 +55,9 @@ async def login_student(payload: LoginRequest, db: AsyncSession = Depends(get_db
     return {"access_token": token, "token_type": "bearer"}
 
 
-@router.post("/officer/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register_officer(payload: OfficerRegisterRequest, db: AsyncSession = Depends(get_db)):
-    """Registers a new internal Admission Officer profile (base role only)."""
-    existing = await db.execute(select(Officer).where(Officer.email == payload.email))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="An officer account with this email already exists.")
-    new_officer = Officer(
-        name=payload.name,
-        email=payload.email,
-        hashed_password=hash_password(payload.password),
-        role=OfficerRole.ADMISSION_OFFICER,  # always base role, never from client input
-    )
-    db.add(new_officer)
-    await db.commit()
-    await db.refresh(new_officer)
-    token = create_access_token(user_id=new_officer.id, user_type="officer")
-    return {"access_token": token, "token_type": "bearer"}
 
 
-
-
-
-@router.post(
-    "/officer/create",
-    response_model=OfficerProfileResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def admin_create_officer(
-    payload: OfficerCreateByAdminRequest,
-    db: AsyncSession = Depends(get_db),
-    _admin: Officer = Depends(RoleGuard([OfficerRole.ADMIN])),
-):
-    """Admin-only: provisions a new officer account with any role, including ADMIN."""
-    existing = await db.execute(select(Officer).where(Officer.email == payload.email))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="An officer account with this email already exists.")
-    new_officer = Officer(
-        name=payload.name,
-        email=payload.email,
-        hashed_password=hash_password(payload.password),
-        role=payload.role,
-    )
-    db.add(new_officer)
-    await db.commit()
-    await db.refresh(new_officer)
-    return new_officer
-
+#==========================================END POINT FOR OFFICER LOGIN====================================================
 
 @router.post("/officer/login", response_model=TokenResponse)
 async def login_officer(payload: LoginRequest, db: AsyncSession = Depends(get_db)):

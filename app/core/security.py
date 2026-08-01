@@ -7,13 +7,23 @@ from app.core.config import settings
 # Explicitly select bcrypt for industry-standard password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
+
+
 def hash_password(password: str) -> str:
     """Hashes a plain-text password using bcrypt before saving it to Neon."""
     return pwd_context.hash(password)
 
+
+
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Compares incoming plain text login credentials against a saved hash."""
     return pwd_context.verify(plain_password, hashed_password)
+
+
+
 
 def create_access_token(
     user_id: str, 

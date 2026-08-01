@@ -5,6 +5,8 @@ from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, UniqueConst
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+
+# now we import all the enums
 from app.models.enums import (
     OfficerRole, ApplicationStatus, DocumentType, 
     ValidationStatus, OfferStatus, NotificationType, 
