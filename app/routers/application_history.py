@@ -31,5 +31,8 @@ async def officer_get_application_audit_trail(
     Secured Officer Endpoint: Provides administrative visibility into the full 
     chronological state transitions of any given application ID for interview verifications.
     """
+    if current_officer is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    
     return await service.get_history_for_officer(application_id)
 

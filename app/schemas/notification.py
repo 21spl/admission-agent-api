@@ -14,8 +14,8 @@ class NotificationLogResponse(BaseModel):
     id: uuid.UUID
     application_id: Optional[uuid.UUID]
     recipient_email: str
-    type: str
-    status: str
+    type: NotificationType
+    status: NotificationStatus
     sent_at: datetime
 
     class Config:

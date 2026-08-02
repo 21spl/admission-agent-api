@@ -10,7 +10,7 @@ from app.database import Base
 from app.models.enums import (
     OfficerRole, ApplicationStatus, DocumentType, 
     ValidationStatus, OfferStatus, NotificationType, 
-    NotificationStatus, LoanStatus
+    NotificationStatus, LoanStatus, AllowedFileType
 )
 
 # Shared timestamp helper mapping to ensure clean system audit generation
@@ -98,21 +98,26 @@ class ApplicationPreference(Base):
 
 class Document(Base):
     __tablename__ = "documents"
-
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("applications.id"), nullable=False)
     doc_type: Mapped[str] = mapped_column(
-    Enum(DocumentType, name="document_type", values_callable=lambda x: [e.value for e in x]),
-    nullable=False)
-    file_path: Mapped[str] = mapped_column(String(500), nullable=False)
+        Enum(DocumentType, name="document_type", values_callable=lambda x: [e.value for e in x]),
+        nullable=False
+    )
+    storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    content_type: Mapped[str] = mapped_column(
+        Enum(AllowedFileType, name="allowed_file_type", values_callable=lambda x: [e.value for e in x]),
+        nullable=False
+    )
+    file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     validation_status: Mapped[str] = mapped_column(
-    Enum(ValidationStatus, name="validation_status", values_callable=lambda x: [e.value for e in x]),
-    default=ValidationStatus.PENDING)
+        Enum(ValidationStatus, name="validation_status", values_callable=lambda x: [e.value for e in x]),
+        default=ValidationStatus.PENDING
+    )
     validation_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
-
     application: Mapped["Application"] = relationship("Application", back_populates="documents")
+
 
 
 class Offer(Base):

@@ -55,4 +55,6 @@ async def get_offers_by_application_id(
     Secured Officer Endpoint: Allows internal admission administrative staff to inspect 
     the full offer ledger associated with any student application index tracker.
     """
+    if current_officer is None:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return await service.list_application_offers(application_id)

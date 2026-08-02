@@ -1,6 +1,9 @@
+import io
 import uuid
 from typing import List
 from fastapi import HTTPException, status
+
+from app.storage import storage_manager, StorageUploadError
 
 # import repositories
 from app.repositories.document_repository import DocumentRepository
@@ -12,7 +15,7 @@ from app.schemas.document import DocumentValidationUpdateRequest
 
 # import models
 from app.models.domain import Document, Student
-from app.models.enums import DocumentType, ValidationStatus, ApplicationStatus
+from app.models.enums import DocumentType, ValidationStatus, ApplicationStatus, AllowedFileType
 
 # import services
 from app.services.application_service import ApplicationService
@@ -23,9 +26,12 @@ class DocumentService:
         self.application_repository = application_repository
         self.application_service = application_service
 
-    async def upload_document_metadata(self, student: Student, doc_type: DocumentType, filename: str) -> Document:
-        """Validates student application context and registers uploaded document paths."""
-        # 1. Look up the student's active application header
+    from app.models.enums import AllowedFileType
+
+    async def upload_document_metadata(
+        self, student: Student, doc_type: DocumentType, filename: str,
+        file_bytes: bytes, content_type: AllowedFileType
+    ) -> Document:
         application = await self.application_repository.get_by_student_id(student.id)
         if not application:
             raise HTTPException(
@@ -33,35 +39,38 @@ class DocumentService:
                 detail="No active application found. Please submit your application marks and preferences first."
             )
 
-        # 2. Check if a document of this type already exists to simulate an overwrite/replacement
         existing_doc = await self.repository.get_by_type(application.id, doc_type.value)
-        
-        # In a real disk setup, you'd save the bytes here. For the free tier cloud plan, 
-        # we generate a unique reference file path string and track it inside Neon.
-        simulated_path = f"uploads/{application.id}/{uuid.uuid4()}_{filename}"
+        storage_key = storage_manager.build_student_doc_key(application.id, doc_type.value, filename)
+
+        try:
+            await storage_manager.upload_document(io.BytesIO(file_bytes), storage_key, content_type.value)
+        except StorageUploadError:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to store the uploaded document. Please try again."
+            )
 
         if existing_doc:
-            existing_doc.file_path = simulated_path
+            existing_doc.storage_key = storage_key
+            existing_doc.content_type = content_type.value
+            existing_doc.file_size_bytes = len(file_bytes)
             existing_doc.validation_status = ValidationStatus.PENDING.value
             existing_doc.validation_reason = None
             updated_doc = await self.repository.update(existing_doc)
-            
-            # Reset application status back to pending documentation review loop
             await self.application_service.update_application_status(
                 application.id, ApplicationStatus.DOCS_PENDING, f"STUDENT_OVERWRITE_{student.id}"
             )
             return updated_doc
 
-        # 3. Create a fresh document record entry
         new_doc = Document(
             application_id=application.id,
             doc_type=doc_type.value,
-            file_path=simulated_path,
+            storage_key=storage_key,
+            content_type=content_type.value,
+            file_size_bytes=len(file_bytes),
             validation_status=ValidationStatus.PENDING.value
         )
         created_doc = await self.repository.create(new_doc)
-
-        # Update application overview state
         await self.application_service.update_application_status(
             application.id, ApplicationStatus.DOCS_PENDING, f"STUDENT_UPLOAD_{student.id}"
         )

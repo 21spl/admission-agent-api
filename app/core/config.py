@@ -14,6 +14,16 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "temporary_local_secret_key_12345!"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+
+    # ---- FILEBASE OBJECT STORAGE CONFIGURATION ----
+    # These will be read dynamically from your updated .env file
+    FILEBASE_ACCESS_KEY: str
+    FILEBASE_SECRET_KEY: str
+    FILEBASE_BUCKET_NAME: str
+    
+    # Filebase uses a fixed, static S3 endpoint URL
+    FILEBASE_ENDPOINT: str = "https://s3.filebase.io"
+
     # Instructs Pydantic to scan, locate, and read the local .env configuration file
     model_config = SettingsConfigDict(
         env_file=".env", 

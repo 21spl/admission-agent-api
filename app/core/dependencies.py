@@ -10,6 +10,9 @@ from app.core.config import settings
 from app.models.domain import Student, Officer
 from app.models.enums import OfficerRole
 
+from fastapi import UploadFile, File, HTTPException, status
+from app.models.enums import AllowedFileType
+
 
 # Sets up the location wrapper where FastAPI will find incoming bearer headers
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/student/login")
@@ -53,6 +56,19 @@ async def get_current_officer(payload: dict = Depends(decode_token_payload), db:
         raise HTTPException(status_code=404, detail="Administrative record profile not found.")
     return officer
 
+
+
+
+
+async def validate_uploaded_file_type(file: UploadFile = File(...)) -> AllowedFileType:
+    """Validates the uploaded file's declared content type before it reaches the service layer."""
+    try:
+        return AllowedFileType(file.content_type)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type '{file.content_type}'. Only PDF and DOCX are accepted."
+        )
 
 
 

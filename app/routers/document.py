@@ -8,25 +8,28 @@ from app.core.dependencies import get_current_student, get_current_officer
 from app.models.domain import Student, Officer
 from app.models.enums import DocumentType
 
+from app.core.dependencies import get_current_student, get_current_officer, validate_uploaded_file_type
+from app.models.enums import AllowedFileType
+
 router = APIRouter(prefix="/documents", tags=["Document Infrastructure"])
+
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file_stream(
-    doc_type: DocumentType = Form(..., description="The classification type of the uploaded document file"),
-    file: UploadFile = File(..., description="The physical file payload payload matching PDF or images"),
+    doc_type: DocumentType = Form(...),
+    file: UploadFile = File(...),
+    validated_content_type: AllowedFileType = Depends(validate_uploaded_file_type),
     service: DocumentService = Depends(get_document_service),
     current_student: Student = Depends(get_current_student)
 ):
-    """
-    Secured Student Endpoint: Allows an authenticated applicant to upload 
-    verification document variants as a multi-part form asset stream.
-    """
+    file_bytes = await file.read()
     return await service.upload_document_metadata(
-        student=current_student, 
-        doc_type=doc_type, 
-        filename=file.filename
+        student=current_student,
+        doc_type=doc_type,
+        filename=file.filename,
+        file_bytes=file_bytes,
+        content_type=validated_content_type
     )
-
 
 @router.get("/application/{application_id}", response_model=List[DocumentResponse], status_code=status.HTTP_200_OK)
 async def get_documents_by_application(
@@ -38,6 +41,8 @@ async def get_documents_by_application(
     Secured Officer Endpoint: Allows an authenticated admission officer to 
     inspect the complete listing of files uploaded against an application instance index.
     """
+    if current_officer is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return await service.list_application_documents(application_id)
 
 
