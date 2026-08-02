@@ -25,6 +25,8 @@ async def get_my_active_offers(
     return await service.list_application_offers(app_record.id)
 
 
+
+
 @router.patch("/{offer_id}/respond", response_model=OfferResponse, status_code=status.HTTP_200_OK)
 async def respond_to_admission_offer(
     offer_id: uuid.UUID,

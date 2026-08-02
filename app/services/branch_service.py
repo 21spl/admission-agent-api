@@ -1,8 +1,13 @@
 import uuid
 from typing import List
 from fastapi import HTTPException, status
+
+
+# import repositories
 from app.repositories.branch_repository import BranchRepository
+# import schemas
 from app.schemas.branch import BranchCreateRequest, BranchUpdateRequest
+# import models
 from app.models.domain import Branch
 
 class BranchService:

@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 from app.models.enums import LoanStatus
+from pydantic import BaseModel, Field, field_validator
 
 class LoanApplicationCreateRequest(BaseModel):
     income_certificate_doc_id: uuid.UUID = Field(..., description="UUID reference link to the uploaded income certificate document")
@@ -10,6 +11,16 @@ class LoanApplicationCreateRequest(BaseModel):
 class LoanStatusUpdateRequest(BaseModel):
     status: LoanStatus = Field(..., description="Must explicitly transition to either APPROVED or REJECTED")
 
+    @classmethod
+    def validate_decision_status(cls, v: LoanStatus) -> LoanStatus:
+        if v not in [LoanStatus.APPROVED, LoanStatus.REJECTED]:
+            raise ValueError("Administrative decision states must be explicitly bounded to APPROVED or REJECTED.")
+        return v
+
+class LoanStatusUpdateRequest(BaseModel):
+    status: LoanStatus = Field(..., description="Must explicitly transition to either APPROVED or REJECTED")
+
+    @field_validator("status")
     @classmethod
     def validate_decision_status(cls, v: LoanStatus) -> LoanStatus:
         if v not in [LoanStatus.APPROVED, LoanStatus.REJECTED]:

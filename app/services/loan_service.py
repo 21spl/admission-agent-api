@@ -1,10 +1,15 @@
 import uuid
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
+
+# import repository
 from app.repositories.loan_repository import LoanRepository
 from app.repositories.application_repository import ApplicationRepository
 from app.repositories.document_repository import DocumentRepository
+
+# import schemas
 from app.schemas.loan import LoanApplicationCreateRequest, LoanStatusUpdateRequest
+# import models
 from app.models.domain import LoanApplication, Student
 from app.models.enums import LoanStatus, DocumentType
 
@@ -60,10 +65,15 @@ class LoanService:
         return loan
 
     async def evaluate_loan_application(self, loan_id: uuid.UUID, data: LoanStatusUpdateRequest) -> LoanApplication:
-        """Processes officer panel decisions, binding UTC timestamps to evaluation events."""
         loan = await self.repository.get_by_id(loan_id)
         if not loan:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target loan tracking record index missing.")
+
+        if data.status not in [LoanStatus.APPROVED, LoanStatus.REJECTED]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Unsupported loan decision status."
+            )
 
         loan.status = data.status.value
         loan.decided_at = datetime.now(timezone.utc)

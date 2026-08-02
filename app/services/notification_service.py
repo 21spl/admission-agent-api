@@ -1,6 +1,8 @@
 import uuid
 from typing import List
+# import repository
 from app.repositories.notification_repository import NotificationRepository
+# import schemas
 from app.schemas.notification import NotificationLogCreate
 from app.models.domain import NotificationLog, Student
 

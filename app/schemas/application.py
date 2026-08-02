@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
+from app.models.enums import ApplicationStatus
 
 class PreferenceEntry(BaseModel):
     branch_id: uuid.UUID
@@ -39,7 +40,7 @@ class ApplicationResponse(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID
     total_marks: float
-    status: str
+    status: ApplicationStatus
     submitted_at: datetime
     updated_at: datetime
     preferences: List[PreferenceResponse]

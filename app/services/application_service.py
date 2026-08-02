@@ -36,7 +36,7 @@ class ApplicationService:
 
         # Seed initial status state history log record block
         initial_history = ApplicationStatusHistory(
-            old_status="NONE",
+            old_status=None,
             new_status=ApplicationStatus.STARTED.value,
             changed_by=f"STUDENT_ID:{student.id}"
         )

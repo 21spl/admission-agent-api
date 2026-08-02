@@ -1,6 +1,7 @@
 import uuid
 from typing import List
 from fastapi import HTTPException, status
+# import repositories
 from app.repositories.application_history_repository import ApplicationStatusHistoryRepository
 from app.repositories.application_repository import ApplicationRepository
 from app.models.domain import ApplicationStatusHistory, Student

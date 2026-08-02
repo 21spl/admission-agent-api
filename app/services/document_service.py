@@ -1,11 +1,20 @@
 import uuid
 from typing import List
 from fastapi import HTTPException, status
+
+# import repositories
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.application_repository import ApplicationRepository
+
+# import schemas
+
 from app.schemas.document import DocumentValidationUpdateRequest
+
+# import models
 from app.models.domain import Document, Student
 from app.models.enums import DocumentType, ValidationStatus, ApplicationStatus
+
+# import services
 from app.services.application_service import ApplicationService
 
 class DocumentService:

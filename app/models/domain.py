@@ -101,7 +101,9 @@ class Document(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("applications.id"), nullable=False)
-    doc_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    doc_type: Mapped[str] = mapped_column(
+    Enum(DocumentType, name="document_type", values_callable=lambda x: [e.value for e in x]),
+    nullable=False)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     validation_status: Mapped[str] = mapped_column(
     Enum(ValidationStatus, name="validation_status", values_callable=lambda x: [e.value for e in x]),
@@ -135,8 +137,12 @@ class ApplicationStatusHistory(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("applications.id"), nullable=False)
-    old_status: Mapped[str] = mapped_column(String(50), nullable=False)
-    new_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    old_status: Mapped[str] = mapped_column(
+    Enum(ApplicationStatus, name="application_status", values_callable=lambda x: [e.value for e in x]),
+    nullable=False)
+    new_status: Mapped[str] = mapped_column(
+    Enum(ApplicationStatus, name="application_status", values_callable=lambda x: [e.value for e in x]),
+    nullable=False)
     changed_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True) # e.g., 'SYSTEM' or Officer UUID string
     
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
@@ -150,8 +156,12 @@ class NotificationLog(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("applications.id"), nullable=True)
     recipient_email: Mapped[str] = mapped_column(String(150), nullable=False)
-    type: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[str] = mapped_column(String(50), default=NotificationStatus.SENT)
+    type: Mapped[str] = mapped_column(
+    Enum(NotificationType, name="notification_type", values_callable=lambda x: [e.value for e in x]),
+    nullable=False)
+    status: Mapped[str] = mapped_column(
+    Enum(NotificationStatus, name="notification_status", values_callable=lambda x: [e.value for e in x]),
+    default=NotificationStatus.SENT)
     
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
 

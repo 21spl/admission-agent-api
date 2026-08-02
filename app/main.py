@@ -3,13 +3,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.core.config import settings
 from app.database import get_db
-from app.routers import auth
+from app.routers import auth, branch, document, loan, notification, offer
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
 
 # include the authentication router
 app.include_router(auth.router)
+app.include_router(branch.router)
+app.include_router(document.router)
+app.include_router(loan.router)
+app.include_router(notification.router)
+app.include_router(offer.router)
+
+
 
 @app.get("/health", status_code=200)
 async def system_health_check(db: AsyncSession = Depends(get_db)):
