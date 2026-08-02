@@ -12,16 +12,19 @@ from app.models.enums import OfficerRole
 
 from fastapi import UploadFile, File, HTTPException, status
 from app.models.enums import AllowedFileType
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 
-# Sets up the location wrapper where FastAPI will find incoming bearer headers
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/student/login")
+
+# Replaces OAuth2PasswordBearer — this is just an "expect a Bearer token" marker for Swagger/OpenAPI
+bearer_scheme = HTTPBearer()
 
 
 #============================= HELPER METHODs TO DECODE JWT PAYLOADS FROM TOKENS ==============================================
 
-async def decode_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
+async def decode_token_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> dict:
     """Intercepts, parses, and cryptographically verifies an incoming JWT."""
+    token = credentials.credentials
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         return payload
