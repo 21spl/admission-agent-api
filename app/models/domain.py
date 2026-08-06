@@ -1,3 +1,5 @@
+# app/models/domain.py
+
 import uuid
 from datetime import datetime, timezone, date
 from typing import List, Optional
@@ -69,6 +71,8 @@ class Application(Base):
     default=ApplicationStatus.STARTED, index=True)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now)
+    validation_flags: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    validation_issues: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Relationships
     student: Mapped["Student"] = relationship("Student", back_populates="application")

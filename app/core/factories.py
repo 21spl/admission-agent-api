@@ -79,3 +79,16 @@ def get_loan_service(db: AsyncSession = Depends(get_db)) -> LoanService:
         document_repository=DocumentRepository(db)
     )
 
+
+
+# app/api/deps.py  (or wherever your other get_*_repository functions live)
+
+from app.repositories.student_repository import StudentRepository
+from app.database import get_db  
+
+async def get_student_repository(
+    session: AsyncSession = Depends(get_db),
+) -> StudentRepository:
+    return StudentRepository(session)
+
+

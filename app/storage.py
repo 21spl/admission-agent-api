@@ -13,6 +13,11 @@ class StorageUploadError(Exception):
     """Raised when a file fails to upload to the object storage backend."""
 
 
+
+class StorageFetchError(Exception):
+    """Raised when a file fails to be retrieved from the object storage backend."""
+
+
 class FilebaseStorageManager:
     def __init__(self):
         self.s3_client = boto3.client(
@@ -73,6 +78,24 @@ class FilebaseStorageManager:
         :raises StorageUploadError: If the upload fails
         """
         return await asyncio.to_thread(self._presign_sync, key, expires_in)
+
+    def _fetch_sync(self, key: str) -> bytes:
+        """
+        Synchronously fetches raw file bytes from the object storage backend.
+
+        :param key: The key under which the file is stored
+        :return: The raw file bytes
+        :raises StorageFetchError: If the fetch fails
+        """
+        try:
+            response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            return response["Body"].read()
+        except ClientError as e:
+            raise StorageFetchError(f"Filebase fetch failed for key '{key}': {e}") from e
+
+    async def fetch_document(self, key: str) -> bytes:
+        """Fetches raw file bytes for a given storage key. Raises StorageFetchError on failure."""
+        return await asyncio.to_thread(self._fetch_sync, key)
 
     @staticmethod
     def build_student_doc_key(application_id: uuid.UUID, doc_type: str, filename: str) -> str:

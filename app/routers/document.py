@@ -1,8 +1,13 @@
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from app.ai.config import initialize_ai_environment
+from app.ai.workflows.document_validation_workflow import DocumentValidationWorkflow
 from app.core.factories import get_document_service
+from app.repositories import application_repository
+from app.core.factories import get_application_repository
 from app.services.document_service import DocumentService
+
 from app.schemas.document import DocumentResponse, DocumentValidationUpdateRequest
 from app.core.dependencies import get_current_student, get_current_officer
 from app.models.domain import Student, Officer
@@ -13,6 +18,7 @@ from app.models.enums import AllowedFileType
 
 router = APIRouter(prefix="/documents", tags=["Document Infrastructure"])
 
+llm = initialize_ai_environment()
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file_stream(
@@ -63,3 +69,33 @@ async def verify_uploaded_document(
         data=payload, 
         officer_name=operator_identity
     )
+
+
+@router.post("/applications/{application_id}/documents/validate")
+async def request_all_document_validation(
+    application_id: uuid.UUID,
+    service: DocumentService = Depends(get_document_service),
+    student: Student = Depends(get_current_student),
+    application_repository: application_repository = Depends(get_application_repository)
+):
+    if student is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    
+    if not await service.check_all_document_types_uploaded(application_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="All document types not uploaded",
+        )
+
+    workflow = DocumentValidationWorkflow(
+        document_service=service,
+        application_repository=application_repository,  
+        llm=llm,
+        timeout=120,
+        verbose=False,
+    )
+
+    result = await workflow.run(application_id=application_id)
+    return result
+
+

@@ -28,6 +28,10 @@ llama-index-core>=0.10.0
 llama-index>=0.10.20
 llama-index-llms-google-genai>=0.9.0
 llama-index-vector-stores-postgres>=0.1.0
+llama-index-embeddings-google-genai
+llama-index-readers-s3
+s3fs
+
 
 # ==============================================================================
 # AUTOMATED TESTING SUITE (Used consistently across all Phases)
