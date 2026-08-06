@@ -219,18 +219,18 @@ class DocumentValidationWorkflow(Workflow):
         processed_doc_types = [d.doc_type for d in ev.extracted_docs]
 
         if ev.flags == 0:
-            await self.document_service.mark_validated(ev.application_id, processed_doc_types)
+            await self.document_service.mark_auto_validated(ev.application_id, processed_doc_types)
             return StopEvent(result={"status": "validated", "flags": 0, "issues": ""})
 
         if ev.flags >= self.threshold:
-            await self.document_service.mark_rejected(
+            await self.document_service.mark_auto_rejected(
                 ev.application_id, reason=ev.issues, doc_types=processed_doc_types
             )
             return StopEvent(
                 result={"status": "rejected", "flags": ev.flags, "issues": ev.issues}
             )
 
-        await self.document_service.mark_pending_review(
+        await self.document_service.mark_auto_pending(
             ev.application_id, flags=ev.flags, issues=ev.issues, doc_types=processed_doc_types
         )
         return StopEvent(

@@ -2,6 +2,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.repositories.branch_repository import BranchRepository
+from app.services.admin_review_service import AdminReviewService
 from app.services.branch_service import BranchService
 
 def get_branch_service(db: AsyncSession = Depends(get_db)) -> BranchService:
@@ -79,7 +80,8 @@ def get_loan_service(db: AsyncSession = Depends(get_db)) -> LoanService:
         document_repository=DocumentRepository(db)
     )
 
-
+def get_admin_review_service(db: AsyncSession = Depends(get_db)) -> AdminReviewService:
+    return AdminReviewService(ApplicationRepository(db), DocumentRepository(db))
 
 # app/api/deps.py  (or wherever your other get_*_repository functions live)
 

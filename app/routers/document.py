@@ -52,23 +52,7 @@ async def get_documents_by_application(
     return await service.list_application_documents(application_id)
 
 
-@router.patch("/{document_id}/verify", response_model=DocumentResponse, status_code=status.HTTP_200_OK)
-async def verify_uploaded_document(
-    document_id: uuid.UUID,
-    payload: DocumentValidationUpdateRequest,
-    service: DocumentService = Depends(get_document_service),
-    current_officer: Officer = Depends(get_current_officer)
-):
-    """
-    Secured Officer Endpoint: Allows a logged-in officer to transition validation 
-    states and flag file exceptions. Automatically prompts application status history re-evaluations.
-    """
-    operator_identity = f"OFFICER_ID:{current_officer.id}"
-    return await service.process_document_validation(
-        document_id=document_id, 
-        data=payload, 
-        officer_name=operator_identity
-    )
+
 
 
 @router.post("/applications/{application_id}/documents/validate")

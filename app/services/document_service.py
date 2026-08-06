@@ -23,14 +23,16 @@ from app.services.application_service import ApplicationService
 # import storage manager
 from app.storage import storage_manager, StorageUploadError, StorageFetchError
 
+from app.models.enums import AllowedFileType
+
 class DocumentService:
     def __init__(self, repository: DocumentRepository, application_repository: ApplicationRepository, application_service: ApplicationService):
         self.repository = repository
         self.application_repository = application_repository
         self.application_service = application_service
 
-    from app.models.enums import AllowedFileType
-
+    
+#=============================================== UPLOAD DOCUMENT ======================================================
     async def upload_document_metadata(
         self, student: Student, doc_type: DocumentType, filename: str,
         file_bytes: bytes, content_type: AllowedFileType
@@ -80,45 +82,14 @@ class DocumentService:
         )
         return await self.repository.get_by_id(doc_id)
 
+
+
+#=============================================== LIST ALL DOCUMENTS FOR AN APPLICATION =========================================
     async def list_application_documents(self, application_id: uuid.UUID) -> List[Document]:
         return await self.repository.get_by_application_id(application_id)
 
-    async def process_document_validation(self, document_id: uuid.UUID, data: DocumentValidationUpdateRequest, officer_name: str) -> Document:
-        """Updates document verification records and evaluates overall application states."""
-        document = await self.repository.get_by_id(document_id)
-        if not document:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document record not found.")
 
-        if document.doc_type in AI_MANAGED_TYPES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{document.doc_type} documents are validated automatically and cannot be manually verified.",
-            )
-
-        # Update document metadata attributes
-        document.validation_status = data.validation_status.value
-        document.validation_reason = data.validation_reason if data.validation_status == ValidationStatus.INVALID else None
-        await self.repository.update(document)
-
-        # Only aggregate over document types this manual path actually owns —
-        # never derive Application.status from AI-managed docs here.
-        all_docs = await self.repository.get_by_application_id(document.application_id)
-        manually_managed_docs = [d for d in all_docs if d.doc_type not in AI_MANAGED_TYPES]
-
-        if manually_managed_docs:
-            if any(d.validation_status == ValidationStatus.INVALID.value for d in manually_managed_docs):
-                await self.application_service.update_application_status(
-                    document.application_id, ApplicationStatus.DOCS_INVALID, officer_name
-                )
-            elif all(d.validation_status == ValidationStatus.VALID.value for d in manually_managed_docs):
-                await self.application_service.update_application_status(
-                    document.application_id, ApplicationStatus.DOCS_VALIDATED, officer_name
-                )
-
-        return await self.repository.get_by_id(document_id)
-
-    
-
+#=============================================== GET DOCUMENT BY ID =========================================
     async def get_document_bytes(self, document_id: uuid.UUID) -> tuple[bytes, str, str]:
         """Fetches the raw file bytes for a document, along with its content type and filename hint."""
         document = await self.repository.get_by_id(document_id)
@@ -135,6 +106,8 @@ class DocumentService:
 
         return file_bytes, document.content_type, document.storage_key
 
+
+#=============================================== GET ALL DOCUMENT BYTES FOR AN APPLICATION =========================================
     async def get_all_document_bytes_for_application(self, application_id: uuid.UUID) -> list[tuple[bytes, str, str]]:
         """Fetches raw bytes for every document belonging to an application, for batch indexing."""
         documents = await self.repository.get_by_application_id(application_id)
@@ -144,14 +117,20 @@ class DocumentService:
             results.append((file_bytes, doc.content_type, doc.storage_key))
         return results
 
-    #-----------------------------------------------------------------------------------------
+# =============================================== CHECK ALL DOCUMENTS UPLOADED OR NOT =========================================
     async def check_all_document_types_uploaded(self, application_id: uuid.UUID) -> bool:
         all_docs = await self.repository.get_by_application_id(application_id)
         required_types = {DocumentType.CLASS12_MARKSHEET.value, DocumentType.ID_CARD.value}
         uploaded_types = {doc.doc_type for doc in all_docs}
         return required_types.issubset(uploaded_types)
 
-    async def mark_validated(self, application_id: uuid.UUID, doc_types: list[str]) -> None:
+
+
+
+#=================================== MARK AUTO VALIDATED BY AI ===================================
+
+
+    async def mark_auto_validated(self, application_id: uuid.UUID, doc_types: list[str]) -> None:
         application = await self.application_repository.get_by_id(application_id)
         application.status = ApplicationStatus.VALIDATED
         application.validation_flags = 0
@@ -166,7 +145,11 @@ class DocumentService:
                 await self.repository.update(doc)
 
 
-    async def mark_rejected(self, application_id: uuid.UUID, reason: str, doc_types: list[str]) -> None:
+
+#=================================== MARK AUTO REJECTED BY AI ===================================
+
+
+    async def mark_auto_rejected(self, application_id: uuid.UUID, reason: str, doc_types: list[str]) -> None:
         application = await self.application_repository.get_by_id(application_id)
         application.status = ApplicationStatus.REJECTED
         application.validation_issues = reason
@@ -180,7 +163,10 @@ class DocumentService:
                 await self.repository.update(doc)
 
 
-    async def mark_pending_review(
+
+#=================================== MARK AUTO PENDING BY AI ===================================
+
+    async def mark_auto_pending(
         self, application_id: uuid.UUID, flags: int, issues: str, doc_types: list[str]
     ) -> None:
         application = await self.application_repository.get_by_id(application_id)
@@ -193,3 +179,12 @@ class DocumentService:
         # the grey-zone case needs a human decision before any doc gets flipped to
         # VALID/INVALID. The admin's eventual decision (submit_review_decision)
         # resolves this via mark_validated/mark_rejected.
+
+
+# ================================== Get download link for a document ==================================
+    async def get_download_link(self, document_id: uuid.UUID) -> str:
+        # get the document record from the database
+        doc = await self.repository.get_by_id(document_id)
+        key = doc.storage_key
+        link = await storage_manager.generate_presigned_url(key)
+        return link
