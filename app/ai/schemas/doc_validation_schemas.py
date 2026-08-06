@@ -1,73 +1,138 @@
 # app/ai/schemas/doc_validation_schemas.py
 
 from datetime import date
-from typing import Dict, Optional
-from pydantic import BaseModel, Field, model_validator
+from typing import Optional
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
+
+
+# -------------------- MARKSHEET -------------------- #
+
+class SubjectMarks(BaseModel):
+    physics: float
+    chemistry: float
+    mathematics: float
+    english: float
 
 
 class Marksheet(BaseModel):
     student_name: str
-    passing_year: int = Field(..., description="The calendar year of passing, e.g., 2026")
+    passing_year: int = Field(
+        ...,
+        description="The calendar year of passing, e.g., 2026",
+    )
     dob: date
     exam_name: str
     certifying_organization: str
-    subject_wise_marks: Dict[str, float]
+
+    subject_wise_marks: SubjectMarks
+
     max_marks: float
     grade: Optional[str] = None
-    
-    # Computed fields (initialized as None, calculated automatically)
+
+    # Computed fields
     subject_count: Optional[int] = None
     total_marks: Optional[float] = None
     percentage: Optional[float] = None
 
     @model_validator(mode="after")
     def calculate_metrics(self) -> "Marksheet":
-        # Automatically count the number of subjects
-        self.subject_count = len(self.subject_wise_marks)
-        
-        # Automatically sum up the marks
-        self.total_marks = sum(self.subject_wise_marks.values())
-        
-        # Automatically calculate percentage based on maximum possible marks
-        if self.max_marks > 0:
-            self.percentage = round((self.total_marks / self.max_marks) * 100, 2)
-            
-        return self
-        
-        
-        
-from datetime import date
-from typing import Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
+        # Validate max marks
+        if self.max_marks <= 0:
+            raise ValueError("max_marks must be greater than 0")
 
+        # Validate subject marks
+        for subject, marks in [
+            ("Physics", self.subject_wise_marks.physics),
+            ("Chemistry", self.subject_wise_marks.chemistry),
+            ("Mathematics", self.subject_wise_marks.mathematics),
+            ("English", self.subject_wise_marks.english),
+        ]:
+            if marks < 0:
+                raise ValueError(f"{subject} marks cannot be negative")
+
+            if marks > self.max_marks:
+                raise ValueError(
+                    f"{subject} marks cannot exceed max_marks"
+                )
+
+        self.subject_count = 4
+
+        self.total_marks = (
+            self.subject_wise_marks.physics
+            + self.subject_wise_marks.chemistry
+            + self.subject_wise_marks.mathematics
+            + self.subject_wise_marks.english
+        )
+
+        self.percentage = round(
+            (self.total_marks / self.max_marks) * 100,
+            2,
+        )
+
+        return self
+
+
+# ---------------- GOVERNMENT ID ---------------- #
 
 class GovernmentIDCard(BaseModel):
-    # Core Identification
-    id_type: str = Field(..., description="Type of ID, e.g., Aadhaar, PAN, Passport, Driving License")
-    id_number: str = Field(..., description="Unique identification number")
-    
-    # Personal Information
-    full_name: str = Field(..., description="Full name printed on the card")
-    father_name: Optional[str] = Field(None, description="Father's or Guardian's name")
-    dob: date = Field(..., description="Date of birth")
-    gender: str = Field(..., description="Gender as mentioned on the ID")
-    address: str = Field(..., description="Full residential address")
-    
+    id_type: str = Field(
+        ...,
+        description="Type of ID such as Aadhaar, PAN, Passport or Driving License",
+    )
 
-    # Clean up whitespace from text inputs automatically
-    @field_validator("id_number", "full_name", "id_type", mode="before")
+    id_number: str = Field(
+        ...,
+        description="Unique identification number",
+    )
+
+    full_name: str = Field(
+        ...,
+        description="Full name printed on the card",
+    )
+
+    father_name: Optional[str] = Field(
+        None,
+        description="Father's or Guardian's name",
+    )
+
+    dob: date = Field(
+        ...,
+        description="Date of birth",
+    )
+
+    gender: str = Field(
+        ...,
+        description="Gender mentioned on the ID",
+    )
+
+    address: str = Field(
+        ...,
+        description="Complete residential address",
+    )
+
+    @field_validator(
+        "id_number",
+        "full_name",
+        "id_type",
+        "address",
+        mode="before",
+    )
     @classmethod
-    def clean_whitespace(cls, value: str) -> str:
+    def strip_whitespace(cls, value):
         if isinstance(value, str):
             return value.strip()
         return value
 
-    # Validate logical flow of dates and compute expiration status
     @model_validator(mode="after")
     def validate_dates(self) -> "GovernmentIDCard":
-
-        # Ensure date of birth is in the past
         if self.dob >= date.today():
-            raise ValueError("dob (Date of Birth) must be in the past")
-    
+            raise ValueError("Date of birth must be in the past")
+
         return self

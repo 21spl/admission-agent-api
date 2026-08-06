@@ -109,10 +109,7 @@ class Document(Base):
         nullable=False
     )
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
-    content_type: Mapped[str] = mapped_column(
-        Enum(AllowedFileType, name="allowed_file_type", values_callable=lambda x: [e.value for e in x]),
-        nullable=False
-    )
+    content_type: Mapped[str] = mapped_column(String(150), nullable=False)
     file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     validation_status: Mapped[str] = mapped_column(
         Enum(ValidationStatus, name="validation_status", values_callable=lambda x: [e.value for e in x]),
@@ -146,9 +143,10 @@ class ApplicationStatusHistory(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("applications.id"), nullable=False)
-    old_status: Mapped[str] = mapped_column(
-    Enum(ApplicationStatus, name="application_status", values_callable=lambda x: [e.value for e in x]),
-    nullable=False)
+    old_status: Mapped[Optional[str]] = mapped_column(
+        Enum(ApplicationStatus, name="application_status", values_callable=lambda x: [e.value for e in x]),
+        nullable=True
+    )
     new_status: Mapped[str] = mapped_column(
     Enum(ApplicationStatus, name="application_status", values_callable=lambda x: [e.value for e in x]),
     nullable=False)

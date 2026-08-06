@@ -18,13 +18,7 @@ async def get_my_active_offers(
     Secured Student Endpoint: Allows an authenticated applicant to look up 
     their history of admission offers.
     """
-    # Fetch active student context application reference mapping
-    app_record = await service.application_repository.get_by_student_id(current_student.id)
-    if not app_record:
-        return []
-    return await service.list_application_offers(app_record.id)
-
-
+    return await service.list_my_offers(current_student)
 
 
 @router.patch("/{offer_id}/respond", response_model=OfferResponse, status_code=status.HTTP_200_OK)
@@ -55,6 +49,4 @@ async def get_offers_by_application_id(
     Secured Officer Endpoint: Allows internal admission administrative staff to inspect 
     the full offer ledger associated with any student application index tracker.
     """
-    if current_officer is None:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    return await service.list_application_offers(application_id)
+    return await service.list_offers_for_application(application_id)

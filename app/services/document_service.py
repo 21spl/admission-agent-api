@@ -74,10 +74,11 @@ class DocumentService:
             validation_status=ValidationStatus.PENDING.value
         )
         created_doc = await self.repository.create(new_doc)
+        doc_id = created_doc.id
         await self.application_service.update_application_status(
             application.id, ApplicationStatus.DOCS_PENDING, f"STUDENT_UPLOAD_{student.id}"
         )
-        return created_doc
+        return await self.repository.get_by_id(doc_id)
 
     async def list_application_documents(self, application_id: uuid.UUID) -> List[Document]:
         return await self.repository.get_by_application_id(application_id)
@@ -97,7 +98,7 @@ class DocumentService:
         # Update document metadata attributes
         document.validation_status = data.validation_status.value
         document.validation_reason = data.validation_reason if data.validation_status == ValidationStatus.INVALID else None
-        updated_doc = await self.repository.update(document)
+        await self.repository.update(document)
 
         # Only aggregate over document types this manual path actually owns —
         # never derive Application.status from AI-managed docs here.
@@ -114,7 +115,7 @@ class DocumentService:
                     document.application_id, ApplicationStatus.DOCS_VALIDATED, officer_name
                 )
 
-        return updated_doc
+        return await self.repository.get_by_id(document_id)
 
     
 

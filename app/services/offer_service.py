@@ -34,6 +34,11 @@ class OfferService:
             return []
         return await self.repository.get_by_application_id(application.id)
 
+    
+    async def list_offers_for_application(self, application_id: uuid.UUID) -> List[Offer]:
+        """Officer-facing: returns all offers for a given application id, regardless of student."""
+        return await self.repository.get_by_application_id(application_id)
+
     async def process_student_decision(self, student: Student, offer_id: uuid.UUID, data: OfferDecisionRequest) -> Offer:
         """Processes student decisions (ACCEPT/REJECT) and dynamically updates seat allocations."""
         # 1. Verify the parent student application envelope

@@ -46,6 +46,13 @@ httpx>=0.27.0
 boto3>=1.35.0
 aioboto3>=13.0.0
 
+# TO READ PDFS
+
+python-docx>=1.0.0
+openpyxl>=3.1.2
+PyPDF2>=3.0.0
+pypdf>=3.15.0
+llama-index-readers-file>=0.6.0
 
 
 

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.core.config import settings
 from app.database import get_db
-from app.routers import auth, branch, document, loan, notification, offer, application_history, application
+from app.routers import auth, branch, document, loan, notification, offer, application_history, application, admin_review
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -17,6 +17,7 @@ app.include_router(notification.router)
 app.include_router(offer.router)
 app.include_router(application_history.router)
 app.include_router(application.router)
+app.include_router(admin_review.router)
 
 
 

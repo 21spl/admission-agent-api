@@ -7,7 +7,7 @@ from app.models.enums import ApplicationStatus
 class ApplicationStatusHistoryResponse(BaseModel):
     id: uuid.UUID
     application_id: uuid.UUID
-    old_status: ApplicationStatus
+    old_status: Optional[ApplicationStatus] = None
     new_status: ApplicationStatus
     changed_by: Optional[str]
     changed_at: datetime

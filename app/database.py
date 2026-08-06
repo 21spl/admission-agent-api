@@ -5,8 +5,11 @@ from app.core.config import settings
 # 1. Create the asynchronous cloud database connection engine
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=True,  # Prints every SQL transaction to your terminal for easy debugging
-    future=True
+    echo=True,
+    future=True,
+    pool_pre_ping=True,   # verify each pooled connection is alive before handing it out
+    pool_recycle=300,     # proactively recycle connections every 5 min, before Neon can drop them
+    connect_args={"statement_cache_size": 0},  # required for asyncpg when using Neon's pooled (PgBouncer) endpoint
 )
 
 # 2. Build the session constructor template
@@ -27,6 +30,3 @@ async def get_db():
             yield session
         finally:
             await session.close()
-
-
-

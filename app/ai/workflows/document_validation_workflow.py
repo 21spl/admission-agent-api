@@ -83,9 +83,7 @@ class DocumentValidationWorkflow(Workflow):
             DocumentType.ID_CARD.value: GovernmentIDCard,
         }
 
-    # ----------------------------------------------------------------
-    # Step 1: Load all documents for the application from S3
-    # ----------------------------------------------------------------
+
     # ----------------------------------------------------------------
     # Step 1: Load all documents for the application from S3
     # ----------------------------------------------------------------
@@ -114,6 +112,8 @@ class DocumentValidationWorkflow(Workflow):
             )
             loaded = reader.load_data()
             for d in loaded:
+                print(f"--- RAW TEXT [{doc.doc_type}] ---")
+                print(repr(d.text[:1000]))
                 d.metadata["doc_type"] = doc.doc_type
             documents.extend(loaded)
 
@@ -125,7 +125,7 @@ class DocumentValidationWorkflow(Workflow):
     @step
     async def dispatch_extractions(
         self, ctx: Context, ev: DocumentsLoadedEvent
-    ) -> None:
+    ) -> Optional[DocExtractionRequestEvent]:
         await ctx.store.set("application_id", ev.application_id)
         await ctx.store.set("expected_count", len(ev.documents))
 
@@ -137,6 +137,7 @@ class DocumentValidationWorkflow(Workflow):
                     text=doc.text,
                 )
             )
+        return None
 
     # ----------------------------------------------------------------
     # Step 3: Run structured extraction for a single document
@@ -147,8 +148,6 @@ class DocumentValidationWorkflow(Workflow):
     ) -> DocExtractedEvent:
         schema = self.schema_map.get(ev.doc_type)
         if schema is None:
-            # ASSUMPTION: unknown doc types are skipped rather than failing
-            # the whole run. Adjust if unknown types should hard-fail instead.
             return DocExtractedEvent(doc_type=ev.doc_type, extracted={})
 
         sllm = self.llm.as_structured_llm(schema)
@@ -187,6 +186,12 @@ class DocumentValidationWorkflow(Workflow):
         # context) the related Student via Application.student.
         application = await self.application_repository.get_with_student(ev.application_id)
         student = application.student
+
+        #for debugging
+        print("MARKSHEET:", marksheet)
+        print("ID CARD:", id_card)
+        print("REG NAME:", student.name if student else None)
+        print("REG DOB:", student.date_of_birth if student else None)
 
         result = cross_match_documents(
             marksheet=marksheet,

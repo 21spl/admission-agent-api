@@ -2,13 +2,15 @@ import uuid
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
-from app.models.enums import DocumentType, ValidationStatus
+from app.models.enums import DocumentType, ValidationStatus, AllowedFileType
 
 class DocumentResponse(BaseModel):
     id: uuid.UUID
     application_id: uuid.UUID
     doc_type: DocumentType
-    file_path: str
+    storage_key: str
+    content_type: str
+    file_size_bytes: int
     validation_status: ValidationStatus
     validation_reason: Optional[str]
     uploaded_at: datetime

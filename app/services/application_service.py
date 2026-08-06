@@ -42,7 +42,13 @@ class ApplicationService:
         )
         new_application.history.append(initial_history)
 
-        return await self.repository.create(new_application)
+        await self.repository.create(new_application)
+
+        # Re-fetch with preferences eagerly loaded — the object returned by
+        # .create() only has its own columns refreshed, not relationships,
+        # and FastAPI's response serialization happens outside the async
+        # session's live context, so any lazy-load there raises MissingGreenlet.
+        return await self.repository.get_by_student_id(student.id)
 
     async def get_student_application(self, student: Student) -> Application:
         application = await self.repository.get_by_student_id(student.id)
@@ -76,5 +82,6 @@ class ApplicationService:
             changed_by=operator_name
         )
         application.history.append(audit_log)
+        await self.repository.update(application)
 
-        return await self.repository.update(application)
+        return await self.repository.get_with_details(application_id)
