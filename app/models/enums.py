@@ -14,6 +14,7 @@ class ApplicationStatus(str, Enum):
     VALIDATED = "VALIDATED"
     REJECTED = "REJECTED"
     PENDING_REVIEW = "PENDING_REVIEW"
+    WITHDRAWN = "WITHDRAWN"
 
     # Following two enums are not used---
     DOCS_VALIDATED = "DOCS_VALIDATED"

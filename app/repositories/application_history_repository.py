@@ -8,6 +8,7 @@ class ApplicationStatusHistoryRepository(BaseRepository[ApplicationStatusHistory
     def __init__(self, db):
         super().__init__(ApplicationStatusHistory, db)
 
+    #============= Get Application Status History by Application ID =================
     async def get_by_application_id(self, application_id: uuid.UUID) -> List[ApplicationStatusHistory]:
         """Fetches the complete audit trail for an application, sorted chronologically."""
         stmt = (
@@ -17,5 +18,4 @@ class ApplicationStatusHistoryRepository(BaseRepository[ApplicationStatusHistory
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-
 

@@ -24,6 +24,8 @@ class LoanService:
         self.application_repository = application_repository
         self.document_repository = document_repository
 
+    #================================ APPLY FOR STUDENT LOAN ==================================
+
     async def apply_for_student_loan(self, student: Student, data: LoanApplicationCreateRequest) -> LoanApplication:
         """Validates parent states and instantiates a unique structural loan application tracking sub-entity."""
         # 1. Look up student application envelope mapping bounds
@@ -54,6 +56,8 @@ class LoanService:
         )
         return await self.repository.create(new_loan)
 
+    # ================================ GET LOAN BY STUDENT ==================================
+
     async def get_loan_by_student(self, student: Student) -> LoanApplication:
         application = await self.application_repository.get_by_student_id(student.id)
         if not application:
@@ -63,6 +67,8 @@ class LoanService:
         if not loan:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No student loan records created for this account.")
         return loan
+
+    #================================= EVALUATE LOAN APPLICATION ==================================
 
     async def evaluate_loan_application(self, loan_id: uuid.UUID, data: LoanStatusUpdateRequest) -> LoanApplication:
         loan = await self.repository.get_by_id(loan_id)

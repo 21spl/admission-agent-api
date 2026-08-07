@@ -3,94 +3,97 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.domain import Offer, Application, ShortlistingPreference, Student
+from app.models.domain import Offer, Student, Branch
 from app.models.enums import OfferStatus, ApplicationStatus
+from app.repositories.shortlisting_preference_repository import ShortlistingPreferenceRepository
 from app.schemas.offer import OfferDecisionRequest, OfferResponse
+
+from app.repositories.offer_repository import OfferRepository
+from app.repositories.application_repository import ApplicationRepository
+from app.services.application_service import ApplicationService
 
 
 class OfferService:
-    def __init__(self, db: AsyncSession):
+    def __init__(
+        self,
+        db: AsyncSession,
+        offer_repository: OfferRepository,
+        application_repository: ApplicationRepository,
+        preference_repository: ShortlistingPreferenceRepository,
+        application_service: ApplicationService,
+    ):
         self.db = db
+        self.offer_repository = offer_repository
+        self.application_repository = application_repository
+        self.preference_repository = preference_repository
+        self.application_service = application_service
 
-
-    #==================================================== LIST OFFERS ======================================================
     async def list_my_offers(self, student: Student) -> List[Offer]:
-        result = await self.db.execute(
-            select(Offer)
-            .join(Application, Application.id == Offer.application_id)
-            .where(Application.student_id == student.id)
-            .order_by(Offer.sent_at.desc())
-        )
-        return result.scalars().all()
+        application = await self.application_repository.get_by_student_id(student.id)
+        if application is None:
+            return []
+        return await self.offer_repository.get_by_application_id(application.id)
 
-    
-    #========================================= LIST OFFERS FOR APPLICATION ==============================================
     async def list_offers_for_application(self, application_id: uuid.UUID) -> List[Offer]:
-        result = await self.db.execute(
-            select(Offer)
-            .where(Offer.application_id == application_id)
-            .order_by(Offer.round_number.asc())
-        )
-        return result.scalars().all()
+        return await self.offer_repository.get_by_application_id(application_id)
 
-    
-    #========================================= PROCESS STUDENT DECISION ==============================================
     async def process_student_decision(
         self, student: Student, offer_id: uuid.UUID, data: OfferDecisionRequest
     ) -> OfferResponse:
-        offer = await self.db.get(Offer, offer_id)
+        offer = await self.offer_repository.get_by_id(offer_id)
         if offer is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Offer not found.")
 
-        application = await self.db.get(Application, offer.application_id)
+        application = await self.application_repository.get_with_details(offer.application_id)
         if application is None or application.student_id != student.id:
-            # don't leak whether the offer exists for someone else's application
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Offer not found.")
 
         if offer.status != OfferStatus.PENDING:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT, f"Offer already resolved (status={offer.status})."
-            )
-        if offer.expires_at < datetime.now(timezone.utc):
-            raise HTTPException(status.HTTP_410_GONE, "This offer has expired.")
+            raise HTTPException(status.HTTP_409_CONFLICT, f"Offer already resolved (status={offer.status}).")
 
         now = datetime.now(timezone.utc)
+        if offer.expires_at < now:
+            raise HTTPException(status.HTTP_410_GONE, "This offer has expired.")
 
         if data.accept:
+            # --- accept path ---
+            stmt = (
+                update(Branch)
+                .where(Branch.id == offer.branch_id)
+                .where(Branch.available_seats > 0)
+                .values(available_seats=Branch.available_seats - 1)
+            )
+            result = await self.db.execute(stmt)
+            if result.rowcount == 0:
+                raise HTTPException(status.HTTP_409_CONFLICT, "No seats remaining for this branch.")
+
             offer.status = OfferStatus.ACCEPTED
             offer.responded_at = now
-            application.status = ApplicationStatus.OFFER_ACCEPTED
-            await self.db.commit()
-            await self.db.refresh(offer)
+            offer = await self.offer_repository.update(offer)
+
+            await self.application_service.update_application_status(
+                application.id, ApplicationStatus.OFFER_ACCEPTED, changed_by=str(student.id)
+            )
             return OfferResponse.model_validate(offer)
 
-        #=================================================== MANAGE REJECTIONS ==========================================
-        first_pref_branch_id = await self.db.scalar(
-            select(ShortlistingPreference.branch_id)
-            .where(ShortlistingPreference.application_id == application.id)
-            .order_by(ShortlistingPreference.preference_order.asc())
-            .limit(1)
-        )
+        # --- reject path ---
+        first_pref = await self.preference_repository.get_first_preference(application.id)
+        first_pref_branch_id = first_pref.branch_id if first_pref else None
 
         offer.status = OfferStatus.REJECTED
         offer.responded_at = now
+        offer = await self.offer_repository.update(offer)
 
         if first_pref_branch_id == offer.branch_id:
-            # capture response data BEFORE delete/commit — the Offer row
-            # cascades away with the Application, so the ORM object is
-            # unusable (expired + gone) once the delete is committed
-            response_data = OfferResponse.model_validate(offer)
-            await self.db.delete(application)
-            await self.db.commit()
-            return response_data
+            await self.application_service.update_application_status(
+                application.id, ApplicationStatus.WITHDRAWN, changed_by=str(student.id)
+            )
+            return OfferResponse.model_validate(offer)
 
-        application.status = ApplicationStatus.OFFER_REJECTED
-        await self.db.commit()
-        await self.db.refresh(offer)
+        await self.application_service.update_application_status(
+            application.id, ApplicationStatus.OFFER_REJECTED, changed_by=str(student.id)
+        )
         return OfferResponse.model_validate(offer)
-
-
-    

@@ -3,6 +3,8 @@ import uuid
 from typing import List
 from fastapi import HTTPException, status
 
+from app.services.application_history_service import ApplicationHistoryService
+from app.services.notification_service import NotificationService
 from app.storage import storage_manager, StorageUploadError
 
 # import repositories
@@ -26,10 +28,20 @@ from app.storage import storage_manager, StorageUploadError, StorageFetchError
 from app.models.enums import AllowedFileType
 
 class DocumentService:
-    def __init__(self, repository: DocumentRepository, application_repository: ApplicationRepository, application_service: ApplicationService):
+    def __init__(
+        self, 
+        repository: DocumentRepository, 
+        application_repository: ApplicationRepository, 
+        application_service: ApplicationService,
+        application_history_service: ApplicationHistoryService, 
+        notification_service: NotificationService):
+
+        
         self.repository = repository
         self.application_repository = application_repository
         self.application_service = application_service
+        self.application_history_service = application_history_service
+        self.notification_service = notification_service
 
     
 #=============================================== UPLOAD DOCUMENT ======================================================

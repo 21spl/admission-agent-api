@@ -6,15 +6,18 @@ from fastapi import Depends
 from app.core.dependencies import get_current_officer
 from app.models.domain import Application, Document, Officer
 from app.models.enums import ApplicationStatus, DocumentType, ValidationStatus
-from app.schemas.document import DocumentValidationUpdateRequest
 
 from app.repositories.application_repository import ApplicationRepository
 from app.repositories.document_repository import DocumentRepository
+from app.services.application_service import ApplicationService
 
 class AdminReviewService:
-    def __init__(self, application_repository: ApplicationRepository, document_repository: DocumentRepository):
+    def __init__(self, application_repository: ApplicationRepository, 
+                 application_service: ApplicationService,
+                 document_repository: DocumentRepository):
         self.application_repository = application_repository
         self.document_repository = document_repository
+        self.application_service = application_service
 
     #====================================== VALIDATE APPLICATION MANUALLY ======================================
     async def validate_application_manually(self, application_id: uuid.UUID) -> Application:
@@ -38,8 +41,13 @@ class AdminReviewService:
         # also set flags to 0
         application.validation_flags = 0
         application.validation_issues = None
+
+        # also call the application service method to update the application status history
+        await self.application_service.update_application_status(application.id, ApplicationStatus.VALIDATED, changed_by="admin")
+
         await self.application_repository.update(application)
 
+    
         return await self.application_repository.get_with_details(application_id)
 
     #====================================== REJECT APPLICATION MANUALLY ======================================
@@ -61,6 +69,10 @@ class AdminReviewService:
 
         # update the application status now
         application.status = ApplicationStatus.REJECTED
+
+        # also call the application service method to update the application status history
+        await self.application_service.update_application_status(application.id, ApplicationStatus.REJECTED, changed_by="admin")
+
         await self.application_repository.update(application)
 
         return await self.application_repository.get_with_details(application_id)
