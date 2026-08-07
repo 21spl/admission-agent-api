@@ -1,3 +1,4 @@
+from pydantic import EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -25,6 +26,12 @@ class Settings(BaseSettings):
     
     # Filebase uses a fixed, static S3 endpoint URL
     FILEBASE_ENDPOINT: str = "https://s3.filebase.io"
+
+    # BREVO
+    # ---- BREVO EMAIL CONFIGURATION ----
+    BREVO_API_KEY: str
+    SENDER_EMAIL: EmailStr
+    SENDER_NAME: str
 
     # Instructs Pydantic to scan, locate, and read the local .env configuration file
     model_config = SettingsConfigDict(

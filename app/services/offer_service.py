@@ -1,95 +1,96 @@
 import uuid
 from datetime import datetime, timezone
 from typing import List
-from fastapi import HTTPException, status
-# import repositories
-from app.repositories.offer_repository import OfferRepository
-from app.repositories.branch_repository import BranchRepository
-from app.repositories.application_repository import ApplicationRepository
 
-# import services
-from app.services.application_service import ApplicationService
-# import schemas
-from app.schemas.offer import OfferDecisionRequest
-from app.models.domain import Offer, Student
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.domain import Offer, Application, ShortlistingPreference, Student
 from app.models.enums import OfferStatus, ApplicationStatus
+from app.schemas.offer import OfferDecisionRequest, OfferResponse
+
 
 class OfferService:
-    def __init__(
-        self, 
-        repository: OfferRepository, 
-        branch_repository: BranchRepository,
-        application_repository: ApplicationRepository,
-        application_service: ApplicationService
-    ):
-        self.repository = repository
-        self.branch_repository = branch_repository
-        self.application_repository = application_repository
-        self.application_service = application_service
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
+
+    #==================================================== LIST OFFERS ======================================================
     async def list_my_offers(self, student: Student) -> List[Offer]:
-        """Resolves the student's own application context and returns their offer ledger."""
-        application = await self.application_repository.get_by_student_id(student.id)
-        if not application:
-            return []
-        return await self.repository.get_by_application_id(application.id)
+        result = await self.db.execute(
+            select(Offer)
+            .join(Application, Application.id == Offer.application_id)
+            .where(Application.student_id == student.id)
+            .order_by(Offer.sent_at.desc())
+        )
+        return result.scalars().all()
 
     
+    #========================================= LIST OFFERS FOR APPLICATION ==============================================
     async def list_offers_for_application(self, application_id: uuid.UUID) -> List[Offer]:
-        """Officer-facing: returns all offers for a given application id, regardless of student."""
-        return await self.repository.get_by_application_id(application_id)
+        result = await self.db.execute(
+            select(Offer)
+            .where(Offer.application_id == application_id)
+            .order_by(Offer.round_number.asc())
+        )
+        return result.scalars().all()
 
-    async def process_student_decision(self, student: Student, offer_id: uuid.UUID, data: OfferDecisionRequest) -> Offer:
-        """Processes student decisions (ACCEPT/REJECT) and dynamically updates seat allocations."""
-        # 1. Verify the parent student application envelope
-        application = await self.application_repository.get_by_student_id(student.id)
-        if not application:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No application found.")
+    
+    #========================================= PROCESS STUDENT DECISION ==============================================
+    async def process_student_decision(
+        self, student: Student, offer_id: uuid.UUID, data: OfferDecisionRequest
+    ) -> OfferResponse:
+        offer = await self.db.get(Offer, offer_id)
+        if offer is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Offer not found.")
 
-        # 2. Extract and validate target offer lifecycle boundaries
-        offer = await self.repository.get_by_id(offer_id)
-        if not offer or offer.application_id != application.id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target offer reference not found.")
+        application = await self.db.get(Application, offer.application_id)
+        if application is None or application.student_id != student.id:
+            # don't leak whether the offer exists for someone else's application
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Offer not found.")
 
-        if offer.status != OfferStatus.PENDING.value:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This offer has already been processed.")
-
-        if datetime.now(timezone.utc) > offer.expires_at.replace(tzinfo=timezone.utc):
-            offer.status = OfferStatus.EXPIRED.value
-            await self.repository.update(offer)
-            await self.application_service.update_application_status(
-                application.id, ApplicationStatus.OFFER_EXPIRED, f"SYSTEM_TIMEOUT_STUDENT_{student.id}"
-            )
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This admission offer has expired.")
-
-        # 3. Handle state machine transitions based on input data
-        operator_log = f"STUDENT_ACTION_{student.id}"
-        offer.responded_at = datetime.now(timezone.utc)
-
-        if data.status == OfferStatus.ACCEPTED:
-            success = await self.branch_repository.decrement_available_seats(offer.branch_id)
-            if not success:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Seat allocation capacity exhausted for this target branch selection."
-                )
-            offer.status = OfferStatus.ACCEPTED.value
-            await self.application_service.update_application_status(
-                application.id, ApplicationStatus.OFFER_ACCEPTED, operator_log
-            )
-
-        elif data.status == OfferStatus.REJECTED:
-            offer.status = OfferStatus.REJECTED.value
-            await self.application_service.update_application_status(
-                application.id, ApplicationStatus.OFFER_REJECTED, operator_log
-            )
-
-        else:
+        if offer.status != OfferStatus.PENDING:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Unsupported offer decision status."
+                status.HTTP_409_CONFLICT, f"Offer already resolved (status={offer.status})."
             )
+        if offer.expires_at < datetime.now(timezone.utc):
+            raise HTTPException(status.HTTP_410_GONE, "This offer has expired.")
 
-        return await self.repository.update(offer)
+        now = datetime.now(timezone.utc)
+
+        if data.accept:
+            offer.status = OfferStatus.ACCEPTED
+            offer.responded_at = now
+            application.status = ApplicationStatus.OFFER_ACCEPTED
+            await self.db.commit()
+            await self.db.refresh(offer)
+            return OfferResponse.model_validate(offer)
+
+        #=================================================== MANAGE REJECTIONS ==========================================
+        first_pref_branch_id = await self.db.scalar(
+            select(ShortlistingPreference.branch_id)
+            .where(ShortlistingPreference.application_id == application.id)
+            .order_by(ShortlistingPreference.preference_order.asc())
+            .limit(1)
+        )
+
+        offer.status = OfferStatus.REJECTED
+        offer.responded_at = now
+
+        if first_pref_branch_id == offer.branch_id:
+            # capture response data BEFORE delete/commit — the Offer row
+            # cascades away with the Application, so the ORM object is
+            # unusable (expired + gone) once the delete is committed
+            response_data = OfferResponse.model_validate(offer)
+            await self.db.delete(application)
+            await self.db.commit()
+            return response_data
+
+        application.status = ApplicationStatus.OFFER_REJECTED
+        await self.db.commit()
+        await self.db.refresh(offer)
+        return OfferResponse.model_validate(offer)
 
 
+    

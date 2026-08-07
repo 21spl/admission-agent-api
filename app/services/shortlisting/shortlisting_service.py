@@ -13,7 +13,7 @@ from app.services.shortlisting.shortlisting_algorithm import (
     build_rank_key,
     run_deferred_acceptance,
 )
-from app.services.mailer import send_offer_email
+from app.services.mail_service import send_offer_email
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,8 @@ ELIGIBLE_STATUSES = (
     ApplicationStatus.OFFER_REJECTED,
     ApplicationStatus.OFFER_EXPIRED,
 )
+# here we don't consider ApplicationStatus.OFFER_PENDING, cause shortlisting is done only after the round window ends
+# all pending offers are automatically rejected
 
 
 # ======================================== RUN SHORTLISTING ROUND ========================================
