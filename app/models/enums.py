@@ -11,16 +11,14 @@ class ApplicationStatus(str, Enum):
     SUBMITTED = "SUBMITTED"
     DOCS_PENDING = "DOCS_PENDING"
 
-    # --- AI workflow path: driven by DocumentValidationWorkflow,
-    #     covers CLASS12_MARKSHEET + ID_CARD only ---
     VALIDATED = "VALIDATED"
     REJECTED = "REJECTED"
     PENDING_REVIEW = "PENDING_REVIEW"
 
-    # --- Manual officer path: driven by process_document_validation,
-    #     covers INCOME_CERTIFICATE + OTHER only ---
+    # Following two enums are not used---
     DOCS_VALIDATED = "DOCS_VALIDATED"
     DOCS_INVALID = "DOCS_INVALID"
+    #----------------------------------------------
 
     OFFER_MADE = "OFFER_MADE"
     OFFER_ACCEPTED = "OFFER_ACCEPTED"

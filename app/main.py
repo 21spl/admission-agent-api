@@ -15,7 +15,7 @@ app.include_router(document.router)
 app.include_router(loan.router)
 app.include_router(notification.router)
 app.include_router(offer.router)
-app.include_router(application_history.router)
+# app.include_router(application_history.router)
 app.include_router(application.router)
 app.include_router(admin_review.router)
 

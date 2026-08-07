@@ -6,12 +6,17 @@ from pydantic import BaseModel, Field, field_validator
 from app.models.enums import ApplicationStatus
 
 
-class ReviewsPendingResponse:
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
+
+class ReviewsPendingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     application_id: uuid.UUID
     submitted_at: datetime
     status: ApplicationStatus
-    validation_flags: int
-    validation_issues: List[str]
+    validation_flags: Optional[int]
+    validation_issues: Optional[str]
     updated_at: datetime
-    class12_Marksheet: str
-    id_card: str
+    class12_marksheet: Optional[str] = None
+    id_card: Optional[str] = None

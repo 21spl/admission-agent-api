@@ -6,7 +6,9 @@ from app.schemas.application import ApplicationCreateRequest, ApplicationRespons
 from app.core.dependencies import get_current_student
 from app.models.domain import Student
 
-router = APIRouter(prefix="/applications", tags=["Application Processing"])
+router = APIRouter(prefix="/applications", tags=["Applications"])
+
+# ================================= SUBMIT APPLICATION ===============================
 
 @router.post("", response_model=ApplicationResponse, status_code=status.HTTP_201_CREATED)
 async def submit_admission_application(
@@ -20,7 +22,7 @@ async def submit_admission_application(
     """
     return await service.create_student_application(current_student, payload)
 
-
+#=============================== GET MY APPLICATION ===============================
 @router.get("/me", response_model=ApplicationResponse, status_code=status.HTTP_200_OK)
 async def get_my_application_profile(
     service: ApplicationService = Depends(get_application_service),

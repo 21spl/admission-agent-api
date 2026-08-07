@@ -1,7 +1,7 @@
 from app.database import Base
 from app.models.domain import (
     Student, Officer, Branch, Application, 
-    ApplicationPreference, Document, Offer, 
+    ShortlistingPreference, Document, Offer, 
     ApplicationStatusHistory, NotificationLog, LoanApplication
 )
 
@@ -11,7 +11,7 @@ __all__ = [
     "Officer",
     "Branch",
     "Application",
-    "ApplicationPreference",
+    "ShortlistingPreference",
     "Document",
     "Offer",
     "ApplicationStatusHistory",

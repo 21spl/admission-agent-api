@@ -44,11 +44,15 @@ class ApplicationRepository(BaseRepository[Application]):
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    
     async def list_by_status(self, status: ApplicationStatus) -> list[Application]:
-        """Fetches all applications currently in a given status (e.g. pending admin review)."""
-        stmt = select(Application).where(Application.status == status)
+        """Fetches all applications currently in a given status (e.g. pending admin review),
+        with documents eagerly loaded for review-queue rendering."""
+        stmt = (
+            select(Application)
+            .where(Application.status == status)
+            .options(selectinload(Application.documents))
+        )
         result = await self.db.execute(stmt)
         return result.scalars().all()
-
-
 

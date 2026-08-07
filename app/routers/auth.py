@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -23,13 +25,19 @@ async def register_student(payload: StudentRegisterRequest, db: AsyncSession = D
     existing = await db.execute(select(Student).where(Student.email == payload.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="A student account with this email already exists.")
+
+    # ensure date of birth is in the past
+    if payload.dob >= date.today():
+        raise HTTPException(status_code=400, detail="Date of birth must be in the past.")
+   
     
     # Instantiate the mapped entity row securely
     new_student = Student(
         name=payload.name,
         email=payload.email,
         hashed_password=hash_password(payload.password),
-        phone=payload.phone
+        phone=payload.phone,
+        date_of_birth=payload.dob
     )
     db.add(new_student)
     await db.commit()

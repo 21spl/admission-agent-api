@@ -34,7 +34,10 @@ class AdminReviewService:
             await self.document_repository.update(doc)
 
         # update the application status now
-        application.status = ApplicationStatus.DOCS_VALIDATED
+        application.status = ApplicationStatus.VALIDATED
+        # also set flags to 0
+        application.validation_flags = 0
+        application.validation_issues = None
         await self.application_repository.update(application)
 
         return await self.application_repository.get_with_details(application_id)

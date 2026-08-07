@@ -14,6 +14,9 @@ from fastapi import UploadFile, File, HTTPException, status
 from app.models.enums import AllowedFileType
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+from datetime import datetime, timedelta, timezone
+from app.core.config import settings
+
 
 
 # Replaces OAuth2PasswordBearer — this is just an "expect a Bearer token" marker for Swagger/OpenAPI
@@ -33,6 +36,9 @@ async def decode_token_payload(credentials: HTTPAuthorizationCredentials = Depen
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid credentials token profile.")
 
+
+#============================= HELPER METHODS TO VALIDATE CURRENT STUDENT ================================================
+
 async def get_current_student(payload: dict = Depends(decode_token_payload), db: AsyncSession = Depends(get_db)) -> Student:
     """Guards student-only endpoints, injecting the authenticated entity row."""
     if payload.get("user_type") != "student":
@@ -45,6 +51,9 @@ async def get_current_student(payload: dict = Depends(decode_token_payload), db:
     if not student:
         raise HTTPException(status_code=404, detail="Student profile not found.")
     return student
+
+
+#============================= HELPER METHODS TO VALIDATE CURRENT OFFICER ================================================
 
 async def get_current_officer(payload: dict = Depends(decode_token_payload), db: AsyncSession = Depends(get_db)) -> Officer:
     """Guards officer-only administrative paths, returning active officer profiles."""
@@ -61,7 +70,7 @@ async def get_current_officer(payload: dict = Depends(decode_token_payload), db:
 
 
 
-
+# ============================= HELPER METHODS TO CHECK FILE TYPE DURING UPLOADS ================================================
 
 async def validate_uploaded_file_type(file: UploadFile = File(...)) -> AllowedFileType:
     """Validates the uploaded file's declared content type before it reaches the service layer."""
@@ -93,3 +102,24 @@ class RoleGuard:
                 detail="Privilege level insufficient to access this secure admin function."
             )
         return current_officer
+
+
+
+#=============================================== CREATE OFFER TOKENS AND VERIFY ================================================
+
+
+OFFER_TOKEN_TTL_HOURS = 72  # simulates the "response window" length
+
+
+def create_offer_token(application_id: int, action: str) -> str:
+    assert action in ("accept", "reject")
+    payload = {
+        "application_id": application_id,
+        "action": action,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=OFFER_TOKEN_TTL_HOURS),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+
+def verify_offer_token(token: str) -> dict:
+    return jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from app.models.enums import OfficerRole
 
 # --- REGISTRATION DATA SCHEMAS (INPUTS) ---
@@ -12,6 +12,10 @@ class StudentRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=50)
     phone: Optional[str] = Field(None, max_length=20)
+    dob: date = Field(
+    ..., 
+    description="Student's date of birth", 
+    examples=["2005-12-31"])
 
 
 

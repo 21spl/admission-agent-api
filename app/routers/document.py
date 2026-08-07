@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from app.ai.config import initialize_ai_environment
 from app.ai.workflows.document_validation_workflow import DocumentValidationWorkflow
 from app.core.factories import get_document_service
-from app.repositories import application_repository
-from app.core.factories import get_application_repository
+from app.repositories import application_repository, student_repository
+from app.core.factories import get_application_repository, get_student_repository
 from app.services.document_service import DocumentService
 
 from app.schemas.document import DocumentResponse, DocumentValidationUpdateRequest
@@ -19,6 +19,8 @@ from app.models.enums import AllowedFileType
 router = APIRouter(prefix="/documents", tags=["Document Infrastructure"])
 
 llm = initialize_ai_environment()
+
+# ================================= UPLOAD DOCUMENT ===============================
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file_stream(
@@ -37,6 +39,9 @@ async def upload_file_stream(
         content_type=validated_content_type
     )
 
+
+'''
+=================================== FOLLOWING METHOD IS LIKELY TO BE DEPRECATED ================================
 @router.get("/application/{application_id}", response_model=List[DocumentResponse], status_code=status.HTTP_200_OK)
 async def get_documents_by_application(
     application_id: uuid.UUID,
@@ -51,7 +56,10 @@ async def get_documents_by_application(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return await service.list_application_documents(application_id)
 
+'''
 
+
+#================================ REQUEST FOR DOCUMENT VALIDATION ================================
 
 
 
@@ -60,7 +68,8 @@ async def request_all_document_validation(
     application_id: uuid.UUID,
     service: DocumentService = Depends(get_document_service),
     student: Student = Depends(get_current_student),
-    application_repository: application_repository = Depends(get_application_repository)
+    application_repository: application_repository = Depends(get_application_repository),
+    student_repository: student_repository = Depends(get_student_repository)
 ):
     if student is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
@@ -74,6 +83,7 @@ async def request_all_document_validation(
     workflow = DocumentValidationWorkflow(
         document_service=service,
         application_repository=application_repository,  
+        student_repository=student_repository,
         llm=llm,
         timeout=120,
         verbose=False,
