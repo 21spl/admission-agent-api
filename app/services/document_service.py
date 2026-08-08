@@ -130,12 +130,10 @@ class DocumentService:
         all_docs = await self.repository.get_by_application_id(application_id)
         required_types = {DocumentType.CLASS12_MARKSHEET.value, DocumentType.ID_CARD.value}
         uploaded_types = {doc.doc_type for doc in all_docs}
-        if (required_types.issubset(uploaded_types)==True):
-            self.application_service.update_application_status(application_id, ApplicationStatus.ALL_DOCS_UPLOADED, "AI")
+        if required_types.issubset(uploaded_types):
+            await self.application_service.update_application_status(application_id, ApplicationStatus.ALL_DOCS_UPLOADED, "AI")
             return True
-        else:
-            return False
-
+        return False
 
 
 
@@ -144,17 +142,20 @@ class DocumentService:
 
     async def mark_auto_validated(self, application_id: uuid.UUID, doc_types: list[str]) -> None:
         application = await self.application_repository.get_by_id(application_id)
-        application.status = ApplicationStatus.VALIDATED
+        # only change the non-status fields and update
         application.validation_flags = 0
         application.validation_issues = None
         await self.application_repository.update(application)
 
+        # now mark all the documments VALID
         all_docs = await self.repository.get_by_application_id(application_id)
         for doc in all_docs:
             if doc.doc_type in doc_types:
                 doc.validation_status = ValidationStatus.VALID.value
                 doc.validation_reason = None
                 await self.repository.update(doc)
+
+        # now only update the application status
         await self.application_service.update_application_status(application_id, ApplicationStatus.VALIDATED, "AI")
 
 
@@ -164,7 +165,7 @@ class DocumentService:
 
     async def mark_auto_rejected(self, application_id: uuid.UUID, reason: str, doc_types: list[str]) -> None:
         application = await self.application_repository.get_by_id(application_id)
-        application.status = ApplicationStatus.REJECTED
+        # only change the non-status fields and update
         application.validation_issues = reason
         await self.application_repository.update(application)
 
@@ -174,6 +175,8 @@ class DocumentService:
                 doc.validation_status = ValidationStatus.INVALID.value
                 doc.validation_reason = reason
                 await self.repository.update(doc)
+
+        # now only update the application status
         await self.application_service.update_application_status(application_id, ApplicationStatus.REJECTED, "AI")
 
 
@@ -184,10 +187,19 @@ class DocumentService:
         self, application_id: uuid.UUID, flags: int, issues: str, doc_types: list[str]
     ) -> None:
         application = await self.application_repository.get_by_id(application_id)
-        application.status = ApplicationStatus.PENDING_REVIEW
+        # only change the non-status fields and update
         application.validation_flags = flags
         application.validation_issues = issues
         await self.application_repository.update(application)
+
+        all_docs = await self.repository.get_by_application_id(application_id)
+        for doc in all_docs:
+            if doc.doc_type in doc_types:
+                doc.validation_status = ValidationStatus.PENDING.value
+                doc.validation_reason = None
+                await self.repository.update(doc)
+
+        # now only update the application status
         await self.application_service.update_application_status(application_id, ApplicationStatus.PENDING_REVIEW, "AI")
 
 

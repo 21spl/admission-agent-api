@@ -10,6 +10,7 @@ class ApplicationRepository(BaseRepository[Application]):
     def __init__(self, db):
         super().__init__(Application, db)
 
+
     async def get_by_student_id(self, student_id: uuid.UUID) -> Optional[Application]:
         """Fetches an existing application record complete with eagerly pre-fetched preferences."""
         stmt = (

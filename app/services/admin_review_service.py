@@ -36,8 +36,7 @@ class AdminReviewService:
             doc.validation_reason = "All documents validated manually by admin"
             await self.document_repository.update(doc)
 
-        # update the application status now
-        application.status = ApplicationStatus.VALIDATED
+        # update the only the non-status fields
         # also set flags to 0
         application.validation_flags = 0
         application.validation_issues = None
@@ -66,9 +65,6 @@ class AdminReviewService:
             doc.validation_status = ValidationStatus.INVALID.value
             doc.validation_reason = "Data mismatch issues"
             await self.document_repository.update(doc)
-
-        # update the application status now
-        application.status = ApplicationStatus.REJECTED
 
         # also call the application service method to update the application status history
         
