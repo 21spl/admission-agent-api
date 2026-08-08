@@ -14,6 +14,7 @@ from app.schemas.offer import OfferDecisionRequest, OfferResponse
 from app.repositories.offer_repository import OfferRepository
 from app.repositories.application_repository import ApplicationRepository
 from app.services.application_service import ApplicationService
+from app.models.domain import ApplicationStatusHistory
 
 
 class OfferService:
@@ -40,6 +41,7 @@ class OfferService:
     async def list_offers_for_application(self, application_id: uuid.UUID) -> List[Offer]:
         return await self.offer_repository.get_by_application_id(application_id)
 
+    
     async def process_student_decision(
         self, student: Student, offer_id: uuid.UUID, data: OfferDecisionRequest
     ) -> OfferResponse:
@@ -58,6 +60,8 @@ class OfferService:
         if offer.expires_at < now:
             raise HTTPException(status.HTTP_410_GONE, "This offer has expired.")
 
+        old_status = application.status
+
         if data.accept:
             # --- accept path ---
             stmt = (
@@ -72,11 +76,19 @@ class OfferService:
 
             offer.status = OfferStatus.ACCEPTED
             offer.responded_at = now
-            offer = await self.offer_repository.update(offer)
 
-            await self.application_service.update_application_status(
-                application.id, ApplicationStatus.OFFER_ACCEPTED, changed_by=str(student.id)
+            application.status = ApplicationStatus.OFFER_ACCEPTED
+            self.db.add(
+                ApplicationStatusHistory(
+                    application_id=application.id,
+                    old_status=old_status,
+                    new_status=ApplicationStatus.OFFER_ACCEPTED,
+                    changed_by=str(student.id),
+                )
             )
+
+            await self.db.commit()
+            await self.db.refresh(offer)
             return OfferResponse.model_validate(offer)
 
         # --- reject path ---
@@ -85,15 +97,22 @@ class OfferService:
 
         offer.status = OfferStatus.REJECTED
         offer.responded_at = now
-        offer = await self.offer_repository.update(offer)
 
-        if first_pref_branch_id == offer.branch_id:
-            await self.application_service.update_application_status(
-                application.id, ApplicationStatus.WITHDRAWN, changed_by=str(student.id)
-            )
-            return OfferResponse.model_validate(offer)
-
-        await self.application_service.update_application_status(
-            application.id, ApplicationStatus.OFFER_REJECTED, changed_by=str(student.id)
+        new_status = (
+            ApplicationStatus.WITHDRAWN
+            if first_pref_branch_id == offer.branch_id
+            else ApplicationStatus.OFFER_REJECTED
         )
+        application.status = new_status
+        self.db.add(
+            ApplicationStatusHistory(
+                application_id=application.id,
+                old_status=old_status,
+                new_status=new_status,
+                changed_by=str(student.id),
+            )
+        )
+
+        await self.db.commit()
+        await self.db.refresh(offer)
         return OfferResponse.model_validate(offer)

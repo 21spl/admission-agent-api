@@ -1,10 +1,14 @@
 import uuid
-from typing import List
+from typing import List  # noqa: UP035
+
+from app.models.domain import NotificationLog, Student
+
 # import repository
 from app.repositories.notification_repository import NotificationLogRepository
+
 # import schemas
 from app.schemas.notification import NotificationLogCreate
-from app.models.domain import NotificationLog, Student
+
 
 class NotificationService:
     def __init__(self, repository: NotificationLogRepository):
@@ -12,18 +16,17 @@ class NotificationService:
 
     async def log_notification(self, data: NotificationLogCreate) -> NotificationLog:
         """Registers a fresh message delivery event inside the database audit ledger."""
-        new_log = NotificationLog(
-            application_id=data.application_id,
+        return await self.repository.create(
             recipient_email=str(data.recipient_email),
-            type=data.type.value,
-            status=data.status.value
+            notification_type=data.type,
+            status=data.status,
+            application_id=data.application_id,
         )
-        return await self.repository.create(new_log)
 
-    async def get_application_logs(self, application_id: uuid.UUID) -> List[NotificationLog]:
+    async def get_application_logs(
+        self, application_id: uuid.UUID
+    ) -> List[NotificationLog]:
         return await self.repository.get_by_application_id(application_id)
 
     async def get_logs_by_email(self, email: str) -> List[NotificationLog]:
         return await self.repository.get_by_recipient_email(email)
-
-

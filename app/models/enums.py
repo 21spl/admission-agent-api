@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class OfficerRole(str, Enum):
     ADMISSION_OFFICER = "ADMISSION_OFFICER"
     ADMIN = "ADMIN"

@@ -1,19 +1,25 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.domain import (
+    Application,
+    Branch,
+    Offer,
+    ShortlistingPreference,
+    Student,
+)
 from app.models.enums import ApplicationStatus, OfferStatus
-from app.models.domain import Application, ShortlistingPreference, Branch, Student, Offer
-
+from app.services.mail_service import MailService
 from app.services.shortlisting.shortlisting_algorithm import (
-    Candidate,
     BranchInfo,
+    Candidate,
     build_rank_key,
     run_deferred_acceptance,
 )
-from app.services.mail_service import MailService
+from app.models.domain import Application, ApplicationStatusHistory, Offer
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +40,7 @@ class ShortlistingService:
     # here we don't consider ApplicationStatus.OFFER_PENDING, cause shortlisting is done only after the round window ends
     # all pending offers are automatically rejected
 
-    def __init__(self, db: AsyncSession, mail_service: MailService):
+    def __init__(self, db: AsyncSession, mail_service: MailService): 
         self.db = db
         self.mail_service = mail_service
 
@@ -45,10 +51,10 @@ class ShortlistingService:
             raise ValueError(f"round_number must be between 1 and {self.MAX_ROUNDS}")
 
         if round_number > 1:
-            await self._expire_stale_offers(self, round_number - 1)
+            await self._expire_stale_offers(round_number - 1)
 
-        seats_remaining = await self._compute_remaining_seats(self)
-        candidates = await self._build_candidate_pool(self)
+        seats_remaining = await self._compute_remaining_seats()
+        candidates = await self._build_candidate_pool()
 
         branch_rows = (await self.db.execute(select(Branch))).scalars().all()
         branches = {
@@ -65,7 +71,18 @@ class ShortlistingService:
 
         for application_id, branch_id in assignments.items():
             app_row = await self.db.get(Application, application_id)
+            old_status = app_row.status
             app_row.status = ApplicationStatus.OFFER_MADE
+            # we need to update the application status history also
+            self.db.add(
+                ApplicationStatusHistory(
+                    application_id=app_row.id,
+                    old_status=old_status,
+                    new_status=ApplicationStatus.OFFER_MADE,
+                    changed_by="SYSTEM:SHORTLISTING",
+                )
+            )
+            
 
             offer = Offer(
                 application_id=app_row.id,
@@ -79,6 +96,8 @@ class ShortlistingService:
             await self.db.flush()  # ensure offer.id + relationships are usable if send_offer_email needs them
 
             await self.mail_service.send_offer_email(app_row, offer)
+
+
 
         await self.db.commit()
         return {
@@ -107,6 +126,9 @@ class ShortlistingService:
             offer.responded_at = now
 
             app_row = await self.db.get(Application, offer.application_id)
+
+            old_status = app_row.status
+
             first_pref_branch_id = await self.db.scalar(
                 select(ShortlistingPreference.branch_id)
                 .where(ShortlistingPreference.application_id == app_row.id)
@@ -114,13 +136,31 @@ class ShortlistingService:
                 .limit(1)
             )
 
+            
             if first_pref_branch_id == offer.branch_id:
                 # timeout on a first-preference offer -> same outcome as an
                 # explicit first-preference reject: application withdrawn
-                await self.db.delete(app_row)
+                
+                app_row.status = ApplicationStatus.WITHDRAWN
+                self.db.add(
+                    ApplicationStatusHistory(
+                        application_id=app_row.id,
+                        old_status=old_status,
+                        new_status=ApplicationStatus.WITHDRAWN,
+                        changed_by="SYSTEM:SHORTLISTING",
+                    )
+                )
                 deleted_count += 1
             else:
                 app_row.status = ApplicationStatus.OFFER_EXPIRED
+                self.db.add(
+                    ApplicationStatusHistory(
+                        application_id=app_row.id,
+                        old_status=old_status,
+                        new_status=ApplicationStatus.OFFER_EXPIRED,
+                        changed_by="SYSTEM:SHORTLISTING",
+                    )
+                )
                 expired_count += 1
 
         logger.info(

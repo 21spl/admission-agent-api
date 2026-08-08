@@ -2,59 +2,61 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-
+from app.repositories.application_history_repository import (
+    ApplicationStatusHistoryRepository,
+)
+from app.repositories.application_repository import ApplicationRepository
 from app.repositories.base_repository import BaseRepository
 from app.repositories.branch_repository import BranchRepository
-from app.repositories.shortlisting_preference_repository import ShortlistingPreferenceRepository
-from app.repositories.student_repository import StudentRepository
-from app.repositories.application_repository import ApplicationRepository
 from app.repositories.document_repository import DocumentRepository
-from app.repositories.offer_repository import OfferRepository
-from app.repositories.application_history_repository import ApplicationStatusHistoryRepository
-from app.repositories.notification_repository import NotificationLogRepository
 from app.repositories.loan_repository import LoanRepository
-
-from app.services.branch_service import BranchService
-from app.services.application_service import ApplicationService
-from app.services.document_service import DocumentService
-from app.services.mail_service import MailService
-from app.services.offer_service import OfferService
-from app.services.application_history_service import ApplicationHistoryService
-from app.services.notification_service import NotificationService
-from app.services.loan_service import LoanService
+from app.repositories.notification_repository import NotificationLogRepository
+from app.repositories.offer_repository import OfferRepository
+from app.repositories.shortlisting_preference_repository import (
+    ShortlistingPreferenceRepository,
+)
+from app.repositories.student_repository import StudentRepository
 from app.services.admin_review_service import AdminReviewService
+from app.services.application_history_service import ApplicationHistoryService
+from app.services.application_service import ApplicationService
+from app.services.branch_service import BranchService
+from app.services.document_service import DocumentService
+from app.services.loan_service import LoanService
+from app.services.mail_service import MailService
+from app.services.notification_service import NotificationService
+from app.services.offer_service import OfferService
 from app.services.shortlisting.shortlisting_service import ShortlistingService
 
 
 # ================================== REPOSITORIES ====================================
-def get_application_history_repository(db: AsyncSession = Depends(get_db)) -> ApplicationStatusHistoryRepository:
+def get_application_history_repository(db: AsyncSession = Depends(get_db)) -> ApplicationStatusHistoryRepository:  # noqa: B008
     return ApplicationStatusHistoryRepository(db)
 
-def get_application_repository(db: AsyncSession = Depends(get_db)) -> ApplicationRepository:
+def get_application_repository(db: AsyncSession = Depends(get_db)) -> ApplicationRepository:  # noqa: B008
     return ApplicationRepository(db)
 
-def get_base_repository(db: AsyncSession = Depends(get_db)) -> BaseRepository:
+def get_base_repository(db: AsyncSession = Depends(get_db)) -> BaseRepository:  # noqa: B008
     return BaseRepository(db)
 
-def get_branch_repository(db: AsyncSession = Depends(get_db)) -> BranchRepository:
+def get_branch_repository(db: AsyncSession = Depends(get_db)) -> BranchRepository:  # noqa: B008
     return BranchRepository(db)
 
-def get_document_repository(db: AsyncSession = Depends(get_db)) -> DocumentRepository:
+def get_document_repository(db: AsyncSession = Depends(get_db)) -> DocumentRepository:  # noqa: B008
     return DocumentRepository(db)
 
-def get_offer_repository(db: AsyncSession = Depends(get_db)) -> OfferRepository:
+def get_offer_repository(db: AsyncSession = Depends(get_db)) -> OfferRepository:  # noqa: B008
     return OfferRepository(db)
 
-def get_notification_repository(db: AsyncSession = Depends(get_db)) -> NotificationLogRepository:
+def get_notification_repository(db: AsyncSession = Depends(get_db)) -> NotificationLogRepository:  # noqa: B008
     return NotificationLogRepository(db)
 
-def get_loan_repository(db: AsyncSession = Depends(get_db)) -> LoanRepository:
+def get_loan_repository(db: AsyncSession = Depends(get_db)) -> LoanRepository:  # noqa: B008
     return LoanRepository(db)
 
-def get_shortlisting_preference_repository(db: AsyncSession = Depends(get_db)) -> ShortlistingPreferenceRepository:
+def get_shortlisting_preference_repository(db: AsyncSession = Depends(get_db)) -> ShortlistingPreferenceRepository:  # noqa: B008
     return ShortlistingPreferenceRepository(db)
 
-def get_student_repository(db: AsyncSession = Depends(get_db)) -> StudentRepository:
+def get_student_repository(db: AsyncSession = Depends(get_db)) -> StudentRepository:  # noqa: B008
     return StudentRepository(db)
 
     
@@ -102,7 +104,7 @@ def get_offer_service(
 ) -> OfferService:
     return OfferService(
         db,
-        repository=OfferRepository(db),
+        offer_repository=OfferRepository(db),
         application_repository=ApplicationRepository(db),
         application_service=application_service,
         preference_repository=ShortlistingPreferenceRepository(db),

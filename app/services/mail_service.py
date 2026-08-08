@@ -1,8 +1,10 @@
 from textwrap import dedent
 
-from app.mail import send_brevo_email  # adjust import path to wherever you saved the file above
-from app.models.domain import Application, Offer, Student
 from app.core.config import settings
+from app.mail import (
+    send_brevo_email,
+)
+from app.models.domain import Application, Offer, Student
 from app.models.enums import NotificationStatus, NotificationType
 from app.schemas.notification import NotificationLogCreate
 from app.services.notification_service import NotificationService
@@ -48,7 +50,7 @@ class MailService:
             NotificationLogCreate(
                 application_id=application.id,
                 recipient_email=student.email,
-                type=NotificationType.OFFER,
+                type=NotificationType.SHORTLIST_OFFER,
                 status=NotificationStatus.SENT,
             )
         )
