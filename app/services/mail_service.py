@@ -1,25 +1,54 @@
+from textwrap import dedent
+
 from app.mail import send_brevo_email  # adjust import path to wherever you saved the file above
 from app.models.domain import Application, Offer, Student
 from app.core.config import settings
+from app.models.enums import NotificationStatus, NotificationType
+from app.schemas.notification import NotificationLogCreate
+from app.services.notification_service import NotificationService
 
 
-#========================================= SEND OFFER MAIL TO STUDENT ===============================
+class MailService:
+    def __init__(self, db, notification_service: NotificationService) -> None:
+        self.db = db
+        self.notification_service = notification_service
 
-async def send_offer_email(db, application: Application, offer: Offer) -> None:
-    student = await db.get(Student, application.student_id)
-    offers_link = f"{settings.PUBLIC_BASE_URL}/offers"
+    async def send_offer_email(
+        self,
+        application: Application,
+        offer: Offer,
+    ) -> None:
+        # Uses self.db directly from the instance
+        student = await self.db.get(Student, application.student_id)
+        if not student:
+            raise ValueError(f"Student {application.student_id} not found")
 
-    subject = f"Admission Offer — Round {offer.round_number}"
-    html_content = f"""
-    <p>Dear {student.name},</p>
-    <p>You've received an admission offer in round {offer.round_number}.</p>
-    <p>Log in to your account and visit <a href="{offers_link}">your offers page</a> to accept or reject.</p>
-    <p>This offer expires on {offer.expires_at.strftime('%d %b %Y, %I:%M %p UTC')}.</p>
-    """
+        offers_link = f"{settings.PUBLIC_BASE_URL}/offers"
+        formatted_expiry = offer.expires_at.strftime("%d %b %Y, %I:%M %p UTC")
 
-    await send_brevo_email(
-        to_email=student.email,
-        to_name=student.name,
-        subject=subject,
-        html_content=html_content,
-    )
+        subject = f"Admission Offer — Round {offer.round_number}"
+        html_content = dedent(
+            f"""\
+            <p>Dear {student.name},</p>
+            <p>You've received an admission offer in round {offer.round_number}.</p>
+            <p>Log in to your account and visit <a href="{offers_link}">your offers page</a> to accept or reject.</p>
+            <p>This offer expires on {formatted_expiry}.</p>
+            """
+        )
+
+        await send_brevo_email(
+            to_email=student.email,
+            to_name=student.name,
+            subject=subject,
+            html_content=html_content.strip(),
+        )
+        # after sending mail, we need to log it in the notification log
+        # but first we need to create data according to NotificationLogCreate schema
+        await self.notification_service.log_notification(
+            NotificationLogCreate(
+                application_id=application.id,
+                recipient_email=student.email,
+                type=NotificationType.OFFER,
+                status=NotificationStatus.SENT,
+            )
+        )

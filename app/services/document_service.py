@@ -33,15 +33,11 @@ class DocumentService:
         repository: DocumentRepository, 
         application_repository: ApplicationRepository, 
         application_service: ApplicationService,
-        application_history_service: ApplicationHistoryService, 
-        notification_service: NotificationService):
-
-        
+    ):
         self.repository = repository
         self.application_repository = application_repository
         self.application_service = application_service
-        self.application_history_service = application_history_service
-        self.notification_service = notification_service
+
 
     
 #=============================================== UPLOAD DOCUMENT ======================================================
@@ -134,7 +130,11 @@ class DocumentService:
         all_docs = await self.repository.get_by_application_id(application_id)
         required_types = {DocumentType.CLASS12_MARKSHEET.value, DocumentType.ID_CARD.value}
         uploaded_types = {doc.doc_type for doc in all_docs}
-        return required_types.issubset(uploaded_types)
+        if (required_types.issubset(uploaded_types)==True):
+            self.application_service.update_application_status(application_id, ApplicationStatus.ALL_DOCS_UPLOADED, "AI")
+            return True
+        else:
+            return False
 
 
 
@@ -155,6 +155,7 @@ class DocumentService:
                 doc.validation_status = ValidationStatus.VALID.value
                 doc.validation_reason = None
                 await self.repository.update(doc)
+        await self.application_service.update_application_status(application_id, ApplicationStatus.VALIDATED, "AI")
 
 
 
@@ -173,6 +174,7 @@ class DocumentService:
                 doc.validation_status = ValidationStatus.INVALID.value
                 doc.validation_reason = reason
                 await self.repository.update(doc)
+        await self.application_service.update_application_status(application_id, ApplicationStatus.REJECTED, "AI")
 
 
 
@@ -186,6 +188,8 @@ class DocumentService:
         application.validation_flags = flags
         application.validation_issues = issues
         await self.application_repository.update(application)
+        await self.application_service.update_application_status(application_id, ApplicationStatus.PENDING_REVIEW, "AI")
+
 
         # Individual Document.validation_status intentionally left as PENDING here —
         # the grey-zone case needs a human decision before any doc gets flipped to
@@ -200,3 +204,6 @@ class DocumentService:
         key = doc.storage_key
         link = await storage_manager.generate_presigned_url(key)
         return link
+
+
+    

@@ -42,10 +42,10 @@ class AdminReviewService:
         application.validation_flags = 0
         application.validation_issues = None
 
+        await self.application_repository.update(application)
+
         # also call the application service method to update the application status history
         await self.application_service.update_application_status(application.id, ApplicationStatus.VALIDATED, changed_by="admin")
-
-        await self.application_repository.update(application)
 
     
         return await self.application_repository.get_with_details(application_id)
@@ -71,9 +71,10 @@ class AdminReviewService:
         application.status = ApplicationStatus.REJECTED
 
         # also call the application service method to update the application status history
-        await self.application_service.update_application_status(application.id, ApplicationStatus.REJECTED, changed_by="admin")
-
+        
         await self.application_repository.update(application)
+
+        await self.application_service.update_application_status(application.id, ApplicationStatus.REJECTED, changed_by="admin")
 
         return await self.application_repository.get_with_details(application_id)
 

@@ -234,6 +234,7 @@ class DocumentValidationWorkflow(Workflow):
         student.marks_chemistry = marksheet.subject_wise_marks.chemistry
         student.marks_maths = marksheet.subject_wise_marks.mathematics
         student.marks_english = marksheet.subject_wise_marks.english
+        student.marks_computer_science = marksheet.subject_wise_marks.computer_science
         student.total_marks = marksheet.total_marks
         student.marks_percentage = marksheet.percentage
 

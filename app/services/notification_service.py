@@ -1,13 +1,13 @@
 import uuid
 from typing import List
 # import repository
-from app.repositories.notification_repository import NotificationRepository
+from app.repositories.notification_repository import NotificationLogRepository
 # import schemas
 from app.schemas.notification import NotificationLogCreate
 from app.models.domain import NotificationLog, Student
 
 class NotificationService:
-    def __init__(self, repository: NotificationRepository):
+    def __init__(self, repository: NotificationLogRepository):
         self.repository = repository
 
     async def log_notification(self, data: NotificationLogCreate) -> NotificationLog:

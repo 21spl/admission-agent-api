@@ -1,0 +1,10 @@
+1. in the application status history table, in the changed by column, it is showing - student id or student upload
+
+2. after validation, status is not being changed to validated
+
+3. in the same table, docs pending column must be changed - separate function to check all docs in ID and MARKSHEET uploaded and then set 
+status to all docs uploaded
+
+4. in the document workflow, i need to count marks of 5th subject, otherwise total marks discrepancy - fixed
+
+

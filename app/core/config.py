@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     SENDER_EMAIL: EmailStr
     SENDER_NAME: str
 
+    PUBLIC_BASE_URL: str = "http://localhost:8001"
+
     # Instructs Pydantic to scan, locate, and read the local .env configuration file
     model_config = SettingsConfigDict(
         env_file=".env", 

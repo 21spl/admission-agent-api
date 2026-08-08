@@ -19,6 +19,7 @@ class SubjectMarks(BaseModel):
     chemistry: float
     mathematics: float
     english: float
+    computer_science: float
 
 
 class Marksheet(BaseModel):
@@ -53,6 +54,7 @@ class Marksheet(BaseModel):
             ("Chemistry", self.subject_wise_marks.chemistry),
             ("Mathematics", self.subject_wise_marks.mathematics),
             ("English", self.subject_wise_marks.english),
+            ("Computer Science", self.subject_wise_marks.computer_science),
         ]:
             if marks < 0:
                 raise ValueError(f"{subject} marks cannot be negative")
@@ -62,13 +64,14 @@ class Marksheet(BaseModel):
                     f"{subject} marks cannot exceed max_marks"
                 )
 
-        self.subject_count = 4
+        self.subject_count = 5
 
         self.total_marks = (
             self.subject_wise_marks.physics
             + self.subject_wise_marks.chemistry
             + self.subject_wise_marks.mathematics
             + self.subject_wise_marks.english
+            + self.subject_wise_marks.computer_science
         )
 
         self.percentage = round(

@@ -35,6 +35,7 @@ class Student(Base):
     marks_chemistry: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     marks_maths: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     marks_english: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    marks_computer_science: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     total_marks: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     marks_percentage: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
