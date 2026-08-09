@@ -5,6 +5,14 @@ from pydantic import BaseModel, Field
 from app.models.enums import LoanStatus
 from pydantic import BaseModel, Field, field_validator
 
+import uuid
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
+
+from app.models.enums import LoanStatus
+
 class LoanApplicationCreateRequest(BaseModel):
     income_certificate_doc_id: uuid.UUID = Field(..., description="UUID reference link to the uploaded income certificate document")
 
@@ -24,9 +32,8 @@ class LoanApplicationResponse(BaseModel):
     application_id: uuid.UUID
     income_certificate_doc_id: uuid.UUID
     status: LoanStatus
+    extracted_annual_income: Optional[float]
     decided_at: Optional[datetime]
 
     class Config:
         from_attributes = True
-
-

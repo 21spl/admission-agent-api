@@ -1,47 +1,44 @@
-import uuid
-from fastapi import APIRouter, Depends, status
-from app.core.factories import get_loan_service
-from app.services.loan_service import LoanService
-from app.schemas.loan import LoanApplicationCreateRequest, LoanStatusUpdateRequest, LoanApplicationResponse
-from app.core.dependencies import get_current_student, get_current_officer
-from app.models.domain import Student, Officer
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-router = APIRouter(prefix="/loans", tags=["Student Loan Infrastructure"])
+from app.core.factories import get_loan_service
+from app.core.dependencies import get_current_student
+from app.models.domain import Student
+from app.models.enums import AllowedFileType
+from app.schemas.loan import LoanApplicationResponse
+from app.services.loan_service import LoanService
+
+router = APIRouter(prefix="/loan", tags=["loan"])
+
+
+ALLOWED_CONTENT_TYPES = {t.value for t in AllowedFileType}
+
 
 @router.post("/apply", response_model=LoanApplicationResponse, status_code=status.HTTP_201_CREATED)
-async def submit_loan_application(
-    payload: LoanApplicationCreateRequest,
-    service: LoanService = Depends(get_loan_service),
-    current_student: Student = Depends(get_current_student)
+async def apply_for_loan(
+    file: UploadFile = File(...),
+    student: Student = Depends(get_current_student),
+    loan_service: LoanService = Depends(get_loan_service),
 ):
-    """
-    Secured Student Endpoint: Allows an authenticated applicant to initialize 
-    a support loan application using an income certificate verification document index.
-    """
-    return await service.apply_for_student_loan(current_student, payload)
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            f"Unsupported file type: {file.content_type}",
+        )
+
+    file_bytes = await file.read()
+    content_type = AllowedFileType(file.content_type)
+
+    return await loan_service.request_loan(
+        student=student,
+        filename=file.filename,
+        file_bytes=file_bytes,
+        content_type=content_type,
+    )
 
 
-@router.get("/me", response_model=LoanApplicationResponse, status_code=status.HTTP_200_OK)
-async def get_my_loan_status(
-    service: LoanService = Depends(get_loan_service),
-    current_student: Student = Depends(get_current_student)
+@router.get("/status", response_model=LoanApplicationResponse)
+async def get_loan_status(
+    student: Student = Depends(get_current_student),
+    loan_service: LoanService = Depends(get_loan_service),
 ):
-    """
-    Secured Student Endpoint: Allows applicants to check evaluation metrics 
-    and progress logs mapped to their profile.
-    """
-    return await service.get_loan_by_student(current_student)
-
-
-@router.patch("/{loan_id}/evaluate", response_model=LoanApplicationResponse, status_code=status.HTTP_200_OK)
-async def officer_evaluate_loan(
-    loan_id: uuid.UUID,
-    payload: LoanStatusUpdateRequest,
-    service: LoanService = Depends(get_loan_service),
-    current_officer: Officer = Depends(get_current_officer)
-):
-    """
-    Secured Officer Endpoint: Restricts processing pipelines to authenticated internal 
-    officers to explicitly APPROVE or REJECT a student loan application folder.
-    """
-    return await service.evaluate_loan_application(loan_id, payload)
+    return await loan_service.get_loan_status(student)

@@ -88,7 +88,7 @@ class DocumentService:
         await self.application_service.update_application_status(
             application.id, ApplicationStatus.DOCS_PENDING, f"STUDENT_UPLOAD_{student.id}"
         )
-        return await self.repository.get_by_id(doc_id)
+        return await self.repository.get_by_id(doc_id) # type: ignore
 
 
 

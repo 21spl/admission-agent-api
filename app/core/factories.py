@@ -35,8 +35,6 @@ def get_application_history_repository(db: AsyncSession = Depends(get_db)) -> Ap
 def get_application_repository(db: AsyncSession = Depends(get_db)) -> ApplicationRepository:  # noqa: B008
     return ApplicationRepository(db)
 
-def get_base_repository(db: AsyncSession = Depends(get_db)) -> BaseRepository:  # noqa: B008
-    return BaseRepository(db)
 
 def get_branch_repository(db: AsyncSession = Depends(get_db)) -> BranchRepository:  # noqa: B008
     return BranchRepository(db)
@@ -114,7 +112,7 @@ def get_offer_service(
 # ============================ GET LOAN SERVICE ===========================================
 def get_loan_service(db: AsyncSession = Depends(get_db)) -> LoanService:
     return LoanService(
-        repository=LoanRepository(db),
+        loan_repository=LoanRepository(db),
         application_repository=ApplicationRepository(db),
         document_repository=DocumentRepository(db),
     )

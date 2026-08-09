@@ -10,5 +10,17 @@
     "python.analysis.autoImportCompletions": true,
     "python.analysis.completeFunctionParens": true,
     "python.analysis.enableTroubleshootMissingImports": true,
-    "python.analysis.typeCheckingMode": "basic"
+    "python.analysis.typeCheckingMode": "basic",
+    "files.autoSave": "afterDelay",
+    "editor.defaultFormatter": "Codeium.codeium",
+    "editor.wordWrap": "on",
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.pytestParameters": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "windsurfPyright.analysis.inlayHints.callArgumentNames": true,
+    "windsurfPyright.analysis.inlayHints.callArgumentNamesMatching": true,
+    "windsurfPyright.analysis.inlayHints.functionReturnTypes": true,
+    "windsurfPyright.analysis.inlayHints.genericTypes": true,
+    "windsurfPyright.analysis.inlayHints.variableTypes": true,
+    "editor.codeActions.triggerOnFocusChange": true
 }

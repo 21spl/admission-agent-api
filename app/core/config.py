@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
     PUBLIC_BASE_URL: str = "http://localhost:8001"
 
+    LOAN_INCOME_THRESHOLD_INR: float = 300_000.00
+
     # Instructs Pydantic to scan, locate, and read the local .env configuration file
     model_config = SettingsConfigDict(
         env_file=".env", 

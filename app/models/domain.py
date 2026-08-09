@@ -194,6 +194,7 @@ class LoanApplication(Base):
     status: Mapped[str] = mapped_column(
     Enum(LoanStatus, name="loan_status", values_callable=lambda x: [e.value for e in x]),
     default=LoanStatus.NOT_REQUESTED)
+    extracted_annual_income: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
