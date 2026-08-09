@@ -37,8 +37,19 @@ async def apply_for_loan(
 
 
 @router.get("/status", response_model=LoanApplicationResponse)
-async def get_loan_status(
+async def get_loan_application(
     student: Student = Depends(get_current_student),
     loan_service: LoanService = Depends(get_loan_service),
 ):
-    return await loan_service.get_loan_status(student)
+    loan_application = await loan_service.get_loan_application(student)
+    # convert to response model
+    response = LoanApplicationResponse(
+        id = loan_application.id,
+        application_id = loan_application.application_id,
+        income_certificate_doc_id = loan_application.income_certificate_doc_id,
+        status = loan_application.status,
+        extracted_annual_income = loan_application.extracted_annual_income,
+        decided_at = loan_application.decided_at,
+    )
+
+    return response

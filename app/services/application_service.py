@@ -11,6 +11,7 @@ class ApplicationService:
     def __init__(self, repository: ApplicationRepository):
         self.repository = repository
 
+    #================================== CREATE STUDENT APPLICATION ==================================
     async def create_student_application(self, student: Student, data: ApplicationCreateRequest) -> Application:
         existing = await self.repository.get_by_student_id(student.id)
         if existing:
@@ -41,12 +42,21 @@ class ApplicationService:
         await self.repository.create(new_application)
         return await self.repository.get_by_student_id(student.id)
 
+    # ================================== GET STUDENT APPLICATION ==================================
     async def get_student_application(self, student: Student) -> Application:
         application = await self.repository.get_by_student_id(student.id)
         if not application:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "No application profile active for this student account.")
         return application
 
+    # ================================== GET APPLICATION BY ID ==================================
+    async def get_application_by_id(self, application_id: uuid.UUID) -> Application:
+        application = await self.repository.get_with_details(application_id)
+        if not application:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Application entry not found.")
+        return application
+
+    # ================================== UPDATE APPLICATION STATUS ==================================
     async def update_application_status(
         self, application_id: uuid.UUID, new_status: ApplicationStatus, changed_by: str
     ) -> Application:

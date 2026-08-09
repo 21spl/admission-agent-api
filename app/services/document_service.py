@@ -90,6 +90,10 @@ class DocumentService:
         )
         return await self.repository.get_by_id(doc_id) # type: ignore
 
+    #=============================================== GET DOCUMENT BY APPLICATION ID AND TYPE =========================================
+    async def get_document_by_application_id_and_type(self, application_id: uuid.UUID, doc_type: DocumentType) -> Document:
+        return await self.repository.get_by_type(application_id, doc_type)
+
 
 
 #=============================================== LIST ALL DOCUMENTS FOR AN APPLICATION =========================================

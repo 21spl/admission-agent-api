@@ -150,7 +150,7 @@ class LoanService:
         return "\n".join(page.extract_text() or "" for page in reader.pages)
 
     # =========================================== GET LOAN STATUS ================================================
-    async def get_loan_status(self, student: Student) -> LoanApplication:
+    async def get_loan_application(self, student: Student) -> LoanApplication:
         application = await self.application_repository.get_by_student_id(student.id)
         if not application:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "No application profile active for this account.")

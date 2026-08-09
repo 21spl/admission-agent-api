@@ -26,6 +26,7 @@ from app.services.mail_service import MailService
 from app.services.notification_service import NotificationService
 from app.services.offer_service import OfferService
 from app.services.shortlisting.shortlisting_service import ShortlistingService
+from app.services.student_service import StudentService
 
 
 # ================================== REPOSITORIES ====================================
@@ -132,6 +133,11 @@ def get_mail_service(db: AsyncSession = Depends(get_db), notification_service: N
 # ================================== GET SHORTLISTING SERVICE ================================
 def get_shortlisting_service(db: AsyncSession = Depends(get_db), mail_service: MailService = Depends(get_mail_service)) -> ShortlistingService:
     return ShortlistingService(db, mail_service)
+
+
+
+def get_student_service(db: AsyncSession = Depends(get_db)) -> StudentService:
+    return StudentService(StudentRepository(db), ApplicationRepository(db))
 
 
 
