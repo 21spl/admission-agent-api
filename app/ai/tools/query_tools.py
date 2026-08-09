@@ -29,7 +29,7 @@ from app.core.factories import get_branch_service, get_application_history_servi
 
 
 
-def build_student_query_tools(db: AsyncSession) -> List[FunctionTool]:
+def get_student_query_tools(db: AsyncSession) -> List[FunctionTool]:
     """
     Factory: call this once per request after JWT Authentication
     """
@@ -125,7 +125,97 @@ def build_student_query_tools(db: AsyncSession) -> List[FunctionTool]:
         }
 
 
+    async def inspect_validation_issue(application_id: uuid.UUID) -> dict:
+        application = await application_service.get_application_by_id(application_id)
+        if application is None:
+            return {"error": "No application found."}
+        return {
+            "application_id": application.id,
+            "validation_issues": application.validation_issues
+        }
+
+    async def list_my_documents(application_id: uuid.UUID) -> list[dict]:
+        doc_list = await document_service.list_application_documents(application_id)
+        return [
+            {
+                "document_id": doc.id,
+                "document_type": doc.doc_type,
+                "document_status": doc.validation_status,
+                "file_type": doc.content_type
+            }
+            for doc in doc_list
+        ]
+
+    async def document_upload_pending(application_id: uuid.UUID) -> List[DocumentType]:
+        application = await application_service.get_application_by_id(application_id)
+        if application is None:
+            return "No application found."
+
+        all_docs = await document_service.list_application_documents(application_id)
+        required_types = {DocumentType.CLASS12_MARKSHEET.value, DocumentType.ID_CARD.value}
+        uploaded_types = {doc.doc_type for doc in all_docs}
+
+        return list(required_types - uploaded_types)
+
+
+    async def get_all_branch_details() -> list[dict]:
+        branch_list = await branch_service.list_branches()
+        return [
+            {
+                "branch_id": branch.id,
+                "branch_name": branch.name,
+                "branch_code": branch.code,
+                "total_seats": branch.total_seats,
+                "cutoff_marks": branch.cutoff_marks
+            }
+            for branch in branch_list
+        ]
+        
+    
+
+
     # ============================= TOOL DEFINITION WITH STRUCTURAL DESCRIPTIONS =============================
+
+    validation_issue_inspection_tool = FunctionTool.from_defaults(
+        async_fn=inspect_validation_issue,
+        name="inspect_application_validation_issues",
+        description=(
+            "Retrieves a list of blockages, data discrepancies, or verification errors preventing "
+            "an application from advancing. Requires a valid application_id (UUID format). "
+            "Ask the student for their application ID if it is not present in the current context."
+        )
+    )
+
+    document_listing_tool = FunctionTool.from_defaults(
+        async_fn=list_my_documents,
+        name="list_student_uploaded_documents",
+        description=(
+            "Fetches metadata for all documents currently uploaded to a student's application profile. "
+            "Shows validation status and file formats. Requires a valid application_id (UUID format). "
+            "Prompt the student for their ID if unknown."
+        )
+    )
+
+    pending_documents_inspection_tool = FunctionTool.from_defaults(
+        async_fn=document_upload_pending,
+        name="get_pending_or_missing_documents",
+        description=(
+            "Checks the application and returns a list of required documents that the student "
+            "has NOT uploaded yet (e.g., missing ID card or marksheets). Requires a valid application_id "
+            "(UUID format). Ask the user for their application ID before running this tool."
+        )
+    )
+
+    branch_details_tool = FunctionTool.from_defaults(
+        async_fn=get_all_branch_details,
+        name="get_all_academic_branch_details",
+        description=(
+            "Provides general information about all available academic branches, including names, codes, "
+            "seat availability, and admission cutoff marks. This is a public query tool and "
+            "does NOT require any application_id or student arguments."
+        )
+    )
+
     application_status_tool = FunctionTool.from_defaults(
         async_fn=get_my_application_status,
         name="get_student_application_status",
@@ -186,6 +276,10 @@ def build_student_query_tools(db: AsyncSession) -> List[FunctionTool]:
     )
 
     return [
+        validation_issue_inspection_tool,
+        document_listing_tool,
+        pending_documents_inspection_tool,
+        branch_details_tool,
         application_status_tool,
         document_download_tool,
         offer_tool,

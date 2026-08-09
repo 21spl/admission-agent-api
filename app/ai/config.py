@@ -31,6 +31,15 @@ def initialize_ai_environment() -> GoogleGenAI:
     
     return llm
 
+
+def get_embedding_model() -> GoogleGenAIEmbedding:
+    embed_model = GoogleGenAIEmbedding(
+    model_name="text-embedding-004",
+    api_key=settings.GOOGLE_API_KEY,
+    )
+
+    return embed_model
+
 async def get_vector_store_instance() -> PGVectorStore:
     """
     Establishes an asynchronous vector database storage engine connection interface 
