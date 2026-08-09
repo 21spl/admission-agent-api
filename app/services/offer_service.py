@@ -116,3 +116,12 @@ class OfferService:
         await self.db.commit()
         await self.db.refresh(offer)
         return OfferResponse.model_validate(offer)
+
+
+    # ======================== CHECK IF THE BRANCH WAS ACTUALLY OFFERED TO STUDENT OR NOT ============================
+    async def check_branch_offered_to_student(self, application_id: uuid.UUID, branch_id: uuid.UUID) -> bool:
+        offer_list = await self.offer_repository.get_by_application_id(application_id)
+        for offer in offer_list:
+            if offer.branch_id == branch_id:
+                return True
+        return False
