@@ -21,8 +21,8 @@ def initialize_ai_environment() -> GoogleGenAI:
     )
     # Instantiate the embed_model
     embed_model = GoogleGenAIEmbedding(
-    model_name="text-embedding-004",
-    api_key=settings.GOOGLE_API_KEY,
+        model_name="gemini-embedding-001",
+        api_key=settings.GOOGLE_API_KEY,
     )
 
     # Assign globally so all sub-agents inherit this framework engine by default
@@ -32,15 +32,16 @@ def initialize_ai_environment() -> GoogleGenAI:
     return llm
 
 
+
+
+
 def get_embedding_model() -> GoogleGenAIEmbedding:
-    embed_model = GoogleGenAIEmbedding(
-    model_name="text-embedding-004",
-    api_key=settings.GOOGLE_API_KEY,
+    return GoogleGenAIEmbedding(
+        model_name="gemini-embedding-001",
+        api_key=settings.GOOGLE_API_KEY,
     )
 
-    return embed_model
-
-async def get_vector_store_instance() -> PGVectorStore:
+def get_vector_store_instance(table_name: str) -> PGVectorStore:
     """
     Establishes an asynchronous vector database storage engine connection interface 
     by parsing your validated Pydantic DATABASE_URL string.
@@ -64,6 +65,6 @@ async def get_vector_store_instance() -> PGVectorStore:
         database=db_name,
         user=username,
         password=password,
-        table_name="vector_knowledge_embeddings",
-        embed_dim=768  # 768 dimensions match Google's text-embedding-004 model standard
+        table_name=table_name,
+        embed_dim=3072  
     )
