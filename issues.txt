@@ -1,10 +1,294 @@
-1. in the application status history table, in the changed by column, it is showing - student id or student upload
+.
+├── alembic
+│   ├── env.py
+│   ├── __pycache__
+│   │   └── env.cpython-311.pyc
+│   ├── README
+│   ├── script.py.mako
+│   └── versions
+│       ├── 35e920338458_add_validation_flags_and_validation_.py
+│       ├── 48c2cbe4ba06_add_round_number_to_offers_rename_.py
+│       ├── 4fe002e24b0a_add_validated_and_pending_review_to_.py
+│       ├── 52bcb77c5e62_added_withdrawn_to_applicationstatus_.py
+│       ├── 5f7c07c12662_create_initial_domain_tables.py
+│       ├── 69ca23eb0a26_make_old_status_nullable_on_application_.py
+│       ├── 8b5da9329247_convert_status_columns_to_enums.py
+│       ├── 9c1315902377_convert_doc_type_status_history_and_.py
+│       ├── abdcbe10440d_add_extracted_income_column_in_loan_.py
+│       ├── b83ce111335b_make_timestamps_timezone_aware.py
+│       ├── ba36f5c96a0b_added_all_docs_uploaded_status_to_.py
+│       ├── cf022ca7a972_add_marks_column_to_student.py
+│       ├── d31547e9ffed_added_cs_marks_column_in_student.py
+│       └── __pycache__
+│           ├── 35e920338458_add_validation_flags_and_validation_.cpython-311.pyc
+│           ├── 48c2cbe4ba06_add_round_number_to_offers_rename_.cpython-311.pyc
+│           ├── 4fe002e24b0a_add_validated_and_pending_review_to_.cpython-311.pyc
+│           ├── 52bcb77c5e62_added_withdrawn_to_applicationstatus_.cpython-311.pyc
+│           ├── 5f7c07c12662_create_initial_domain_tables.cpython-311.pyc
+│           ├── 69ca23eb0a26_make_old_status_nullable_on_application_.cpython-311.pyc
+│           ├── 8b5da9329247_convert_status_columns_to_enums.cpython-311.pyc
+│           ├── 9c1315902377_convert_doc_type_status_history_and_.cpython-311.pyc
+│           ├── abdcbe10440d_add_extracted_income_column_in_loan_.cpython-311.pyc
+│           ├── b83ce111335b_make_timestamps_timezone_aware.cpython-311.pyc
+│           ├── ba36f5c96a0b_added_all_docs_uploaded_status_to_.cpython-311.pyc
+│           ├── cf022ca7a972_add_marks_column_to_student.cpython-311.pyc
+│           ├── d31547e9ffed_added_cs_marks_column_in_student.cpython-311.pyc
+│           └── d503bc1ed7b9_add_validation_flags_and_validation_.cpython-311.pyc
+├── alembic.ini
+├── app
+│   ├── ai
+│   │   ├── agents
+│   │   │   ├── application_agent.py
+│   │   │   ├── counsellor_agent.py
+│   │   │   ├── document_agent.py
+│   │   │   ├── front_desk_agent.py
+│   │   │   ├── __init__.py
+│   │   │   ├── loan_agent.py
+│   │   │   ├── offer_agent.py
+│   │   │   ├── orchestrator.py
+│   │   │   └── __pycache__
+│   │   │       ├── application_agent.cpython-311.pyc
+│   │   │       ├── counsellor_agent.cpython-311.pyc
+│   │   │       ├── document_agent.cpython-311.pyc
+│   │   │       ├── front_desk_agent.cpython-311.pyc
+│   │   │       ├── __init__.cpython-311.pyc
+│   │   │       ├── loan_agent.cpython-311.pyc
+│   │   │       ├── offer_agent.cpython-311.pyc
+│   │   │       ├── orchestrator.cpython-311.pyc
+│   │   │       └── test_ai_agent.cpython-311.pyc
+│   │   ├── config.py
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── config.cpython-311.pyc
+│   │   │   └── __init__.cpython-311.pyc
+│   │   ├── rag
+│   │   │   ├── corpora.py
+│   │   │   ├── index_builder.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── corpora.cpython-311.pyc
+│   │   │   │   ├── index_builder.cpython-311.pyc
+│   │   │   │   └── query_engines.cpython-311.pyc
+│   │   │   └── query_engines.py
+│   │   ├── schemas
+│   │   │   ├── chat_support_schemas.py
+│   │   │   ├── doc_validation_schemas.py
+│   │   │   └── __pycache__
+│   │   │       ├── chat_support_schemas.cpython-311.pyc
+│   │   │       └── doc_validation_schemas.cpython-311.pyc
+│   │   ├── tools
+│   │   │   ├── application_query_tools.py
+│   │   │   ├── document_query_tools.py
+│   │   │   ├── __init__.py
+│   │   │   ├── loan_query_tools.py
+│   │   │   ├── offer_query_tools.py
+│   │   │   └── __pycache__
+│   │   │       ├── application_query_tools.cpython-311.pyc
+│   │   │       ├── document_query_tools.cpython-311.pyc
+│   │   │       ├── __init__.cpython-311.pyc
+│   │   │       ├── loan_query_tools.cpython-311.pyc
+│   │   │       └── offer_query_tools.cpython-311.pyc
+│   │   ├── validation
+│   │   │   ├── cross_match.py
+│   │   │   └── __pycache__
+│   │   │       └── cross_match.cpython-311.pyc
+│   │   └── workflows
+│   │       ├── document_validation_workflow.py
+│   │       └── __pycache__
+│   │           └── document_validation_workflow.cpython-311.pyc
+│   ├── core
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   ├── factories.py
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── config.cpython-311.pyc
+│   │   │   ├── dependencies.cpython-311.pyc
+│   │   │   ├── factories.cpython-311.pyc
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   └── security.cpython-311.pyc
+│   │   └── security.py
+│   ├── database.py
+│   ├── mail.py
+│   ├── main.py
+│   ├── models
+│   │   ├── domain.py
+│   │   ├── enums.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── domain.cpython-311.pyc
+│   │       ├── enums.cpython-311.pyc
+│   │       └── __init__.cpython-311.pyc
+│   ├── __pycache__
+│   │   ├── database.cpython-311.pyc
+│   │   ├── mail.cpython-311.pyc
+│   │   ├── main.cpython-311.pyc
+│   │   ├── storage.cpython-311.pyc
+│   │   └── test_document_loading.cpython-311.pyc
+│   ├── repositories
+│   │   ├── application_history_repository.py
+│   │   ├── application_repository.py
+│   │   ├── base_repository.py
+│   │   ├── branch_repository.py
+│   │   ├── document_repository.py
+│   │   ├── loan_repository.py
+│   │   ├── notification_repository.py
+│   │   ├── offer_repository.py
+│   │   ├── __pycache__
+│   │   │   ├── application_history_repository.cpython-311.pyc
+│   │   │   ├── application_repository.cpython-311.pyc
+│   │   │   ├── base_repository.cpython-311.pyc
+│   │   │   ├── branch_repository.cpython-311.pyc
+│   │   │   ├── document_repository.cpython-311.pyc
+│   │   │   ├── loan_repository.cpython-311.pyc
+│   │   │   ├── notification_repository.cpython-311.pyc
+│   │   │   ├── offer_repository.cpython-311.pyc
+│   │   │   ├── shortlisting_preference_repository.cpython-311.pyc
+│   │   │   └── student_repository.cpython-311.pyc
+│   │   ├── shortlisting_preference_repository.py
+│   │   └── student_repository.py
+│   ├── routers
+│   │   ├── admin_review.py
+│   │   ├── admin_shortlisting.py
+│   │   ├── application_history.py
+│   │   ├── application.py
+│   │   ├── auth.py
+│   │   ├── branch.py
+│   │   ├── document.py
+│   │   ├── loan.py
+│   │   ├── notification.py
+│   │   ├── offer.py
+│   │   ├── __pycache__
+│   │   │   ├── admin_review.cpython-311.pyc
+│   │   │   ├── admin_shortlisting.cpython-311.pyc
+│   │   │   ├── application.cpython-311.pyc
+│   │   │   ├── application_history.cpython-311.pyc
+│   │   │   ├── auth.cpython-311.pyc
+│   │   │   ├── branch.cpython-311.pyc
+│   │   │   ├── document.cpython-311.pyc
+│   │   │   ├── loan.cpython-311.pyc
+│   │   │   ├── notification.cpython-311.pyc
+│   │   │   ├── offer.cpython-311.pyc
+│   │   │   └── student_support.cpython-311.pyc
+│   │   └── student_support.py
+│   ├── schemas
+│   │   ├── application_history.py
+│   │   ├── application.py
+│   │   ├── application_review.py
+│   │   ├── auth.py
+│   │   ├── branch.py
+│   │   ├── document.py
+│   │   ├── loan.py
+│   │   ├── notification.py
+│   │   ├── offer.py
+│   │   └── __pycache__
+│   │       ├── application.cpython-311.pyc
+│   │       ├── application_history.cpython-311.pyc
+│   │       ├── application_review.cpython-311.pyc
+│   │       ├── auth.cpython-311.pyc
+│   │       ├── branch.cpython-311.pyc
+│   │       ├── document.cpython-311.pyc
+│   │       ├── loan.cpython-311.pyc
+│   │       ├── notification.cpython-311.pyc
+│   │       └── offer.cpython-311.pyc
+│   ├── scripts
+│   │   ├── create_admin.py
+│   │   ├── ingest_branch_eligibility_index.py
+│   │   ├── ingest_document_validation_index.py
+│   │   ├── ingest_loan_policy_index.py
+│   │   ├── ingest_offer_policy_index.py
+│   │   └── __pycache__
+│   │       ├── create_admin.cpython-311.pyc
+│   │       ├── ingest_branch_eligibility_index.cpython-311.pyc
+│   │       ├── ingest_document_validation_index.cpython-311.pyc
+│   │       ├── ingest_loan_policy_index.cpython-311.pyc
+│   │       └── ingest_offer_policy_index.cpython-311.pyc
+│   ├── services
+│   │   ├── admin_review_service.py
+│   │   ├── application_history_service.py
+│   │   ├── application_service.py
+│   │   ├── branch_service.py
+│   │   ├── document_service.py
+│   │   ├── loan_service.py
+│   │   ├── mail_service.py
+│   │   ├── notification_service.py
+│   │   ├── offer_service.py
+│   │   ├── __pycache__
+│   │   │   ├── admin_review_service.cpython-311.pyc
+│   │   │   ├── application_history_service.cpython-311.pyc
+│   │   │   ├── application_service.cpython-311.pyc
+│   │   │   ├── branch_service.cpython-311.pyc
+│   │   │   ├── document_service.cpython-311.pyc
+│   │   │   ├── loan_service.cpython-311.pyc
+│   │   │   ├── mail_service.cpython-311.pyc
+│   │   │   ├── notification_service.cpython-311.pyc
+│   │   │   ├── offer_service.cpython-311.pyc
+│   │   │   └── student_service.cpython-311.pyc
+│   │   ├── shortlisting
+│   │   │   ├── __pycache__
+│   │   │   │   ├── shortlisting_algorithm.cpython-311.pyc
+│   │   │   │   └── shortlisting_service.cpython-311.pyc
+│   │   │   ├── shortlisting_algorithm.py
+│   │   │   └── shortlisting_service.py
+│   │   └── student_service.py
+│   ├── storage.py
+│   └── test_document_loading.py
+├── conftest.py
+├── error.txt
+├── issues.txt
+├── __pycache__
+│   └── conftest.cpython-311-pytest-9.1.1.pyc
+├── pytest.ini
+├── README.md
+├── requirements.txt
+└── tests
+    ├── __init__.py
+    ├── __pycache__
+    │   ├── __init__.cpython-311.pyc
+    │   └── test_health.cpython-311-pytest-9.1.1.pyc
+    ├── test_agents
+    │   ├── __pycache__
+    │   │   ├── test_agents.cpython-311-pytest-9.1.1.pyc
+    │   │   ├── test_db_query_tools.cpython-311-pytest-9.1.1.pyc
+    │   │   └── test_query_engines.cpython-311-pytest-9.1.1.pyc
+    │   ├── test_agents.py
+    │   ├── test_db_query_tools.py
+    │   └── test_query_engines.py
+    ├── test_health.py
+    ├── test_routers
+    │   ├── __pycache__
+    │   │   ├── test_admin_review_router.cpython-311-pytest-9.1.1.pyc
+    │   │   ├── test_admin_shortlisting_router.cpython-311-pytest-9.1.1.pyc
+    │   │   ├── test_application_history_router.cpython-311-pytest-9.1.1.pyc
+    │   │   ├── test_application_router.cpython-311-pytest-9.1.1.pyc
+    │   │   ├── test_auth_router.cpython-311-pytest-9.1.1.pyc
+    │   │   ├── test_branch_router.cpython-311-pytest-9.1.1.pyc
+    │   │   ├── test_document_router.cpython-311-pytest-9.1.1.pyc
+    │   │   └── test_offer_router.cpython-311-pytest-9.1.1.pyc
+    │   ├── test_admin_review_router.py
+    │   ├── test_admin_shortlisting_router.py
+    │   ├── test_application_history_router.py
+    │   ├── test_application_router.py
+    │   ├── test_auth_router.py
+    │   ├── test_branch_router.py
+    │   ├── test_document_router.py
+    │   └── test_offer_router.py
+    └── test_services
+        ├── __pycache__
+        │   ├── test_application_service.cpython-311-pytest-9.1.1.pyc
+        │   ├── test_auth_dependencies.cpython-311-pytest-9.1.1.pyc
+        │   ├── test_branch_service.cpython-311-pytest-9.1.1.pyc
+        │   ├── test_document_service.cpython-311-pytest-9.1.1.pyc
+        │   ├── test_loan_service.cpython-311-pytest-9.1.1.pyc
+        │   ├── test_offer_service.cpython-311-pytest-9.1.1.pyc
+        │   ├── test_shortlisting_service.cpython-311-pytest-9.1.1.pyc
+        │   └── test_student_service.cpython-311-pytest-9.1.1.pyc
+        ├── test_application_service.py
+        ├── test_auth_dependencies.py
+        ├── test_branch_service.py
+        ├── test_document_service.py
+        ├── test_loan_service.py
+        ├── test_offer_service.py
+        ├── test_shortlisting_service.py
+        └── test_student_service.py
 
-2. after validation, status is not being changed to validated
-
-3. in the same table, docs pending column must be changed - separate function to check all docs in ID and MARKSHEET uploaded and then set 
-status to all docs uploaded
-
-4. in the document workflow, i need to count marks of 5th subject, otherwise total marks discrepancy - fixed
-
-
+46 directories, 246 files
