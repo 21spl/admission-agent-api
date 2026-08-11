@@ -292,3 +292,10 @@
         └── test_student_service.py
 
 46 directories, 246 files
+
+
+
+Two things worth flagging before you run it:
+
+pages/3_Documents.py — the "Verification Status" tab is a placeholder since there's no student-facing list-documents endpoint yet (confirmed above).
+Officer-side UI doesn't exist yet — you never confirmed whether this Streamlit app should also serve officers (admin_review.py, admin_shortlisting.py). Right now an officer can log in via app.py, but every page (require_student()) will block them. If you want an admin panel too, let me know and I'll scaffold pages/ for officers separately (or a role-based sidebar split).

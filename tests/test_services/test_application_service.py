@@ -1,17 +1,20 @@
 # tests/test_track_a/test_application_service.py
 import uuid
+
 import pytest
 from fastapi import HTTPException
 
 from app.core.factories import get_application_service
-from app.schemas.application import ApplicationCreateRequest, PreferenceEntry
 from app.models.enums import ApplicationStatus
-
+from app.schemas.application import ApplicationCreateRequest, PreferenceEntry
 
 # ---------------- create_student_application ----------------
 
+
 @pytest.mark.asyncio
-async def test_create_student_application_succeeds_for_new_student(db_session, test_student, test_branch):
+async def test_create_student_application_succeeds_for_new_student(
+    db_session, test_student, test_branch
+):
     service = get_application_service(db_session)
     data = ApplicationCreateRequest(
         total_marks=78.0,
@@ -26,7 +29,9 @@ async def test_create_student_application_succeeds_for_new_student(db_session, t
 
 
 @pytest.mark.asyncio
-async def test_create_student_application_rejects_duplicate(db_session, test_student, test_application, test_branch):
+async def test_create_student_application_rejects_duplicate(
+    db_session, test_student, test_application, test_branch
+):
     service = get_application_service(db_session)
     data = ApplicationCreateRequest(
         total_marks=60.0,
@@ -41,7 +46,9 @@ async def test_create_student_application_rejects_duplicate(db_session, test_stu
 
 
 @pytest.mark.asyncio
-async def test_create_student_application_records_initial_status_history(db_session, test_student, test_branch):
+async def test_create_student_application_records_initial_status_history(
+    db_session, test_student, test_branch
+):
     service = get_application_service(db_session)
     data = ApplicationCreateRequest(
         total_marks=91.0,
@@ -56,7 +63,9 @@ async def test_create_student_application_records_initial_status_history(db_sess
 
 
 @pytest.mark.asyncio
-async def test_create_student_application_rejects_duplicate_branch_preferences(db_session, test_student, test_branch):
+async def test_create_student_application_rejects_duplicate_branch_preferences(
+    db_session, test_student, test_branch
+):
     """
     Schema-level validation, not service-level, but worth confirming it
     actually fires: same branch listed twice should be rejected before
@@ -74,15 +83,20 @@ async def test_create_student_application_rejects_duplicate_branch_preferences(d
 
 # ---------------- get_student_application ----------------
 
+
 @pytest.mark.asyncio
-async def test_get_student_application_returns_existing(db_session, test_student, test_application):
+async def test_get_student_application_returns_existing(
+    db_session, test_student, test_application
+):
     service = get_application_service(db_session)
     result = await service.get_student_application(test_student)
     assert result.id == test_application.id
 
 
 @pytest.mark.asyncio
-async def test_get_student_application_raises_404_when_none_exists(db_session, test_student):
+async def test_get_student_application_raises_404_when_none_exists(
+    db_session, test_student
+):
     service = get_application_service(db_session)
     with pytest.raises(HTTPException) as exc_info:
         await service.get_student_application(test_student)
@@ -91,8 +105,11 @@ async def test_get_student_application_raises_404_when_none_exists(db_session, t
 
 # ---------------- get_application_by_id ----------------
 
+
 @pytest.mark.asyncio
-async def test_get_application_by_id_returns_real_application(db_session, test_application):
+async def test_get_application_by_id_returns_real_application(
+    db_session, test_application
+):
     service = get_application_service(db_session)
     fetched = await service.get_application_by_id(test_application.id)
     assert fetched.id == test_application.id
@@ -108,8 +125,11 @@ async def test_get_application_by_id_raises_404_for_unknown_id(db_session):
 
 # ---------------- update_application_status ----------------
 
+
 @pytest.mark.asyncio
-async def test_update_application_status_changes_status_and_records_history(db_session, test_application):
+async def test_update_application_status_changes_status_and_records_history(
+    db_session, test_application
+):
     service = get_application_service(db_session)
 
     updated = await service.update_application_status(
@@ -124,7 +144,9 @@ async def test_update_application_status_changes_status_and_records_history(db_s
 
 
 @pytest.mark.asyncio
-async def test_update_application_status_is_idempotent_no_op_when_status_unchanged(db_session, test_application):
+async def test_update_application_status_is_idempotent_no_op_when_status_unchanged(
+    db_session, test_application
+):
     service = get_application_service(db_session)
 
     result = await service.update_application_status(

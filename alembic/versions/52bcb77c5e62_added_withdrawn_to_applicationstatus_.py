@@ -5,17 +5,16 @@ Revises: cf022ca7a972
 Create Date: 2026-08-07 17:15:02.821792
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
-revision: str = '52bcb77c5e62'
-down_revision: Union[str, Sequence[str], None] = 'cf022ca7a972'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "52bcb77c5e62"
+down_revision: str | Sequence[str] | None = "cf022ca7a972"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -32,4 +31,3 @@ def downgrade() -> None:
     # renaming the new one in its place — destructive if any row is
     # currently WITHDRAWN. Left as a no-op; only build the full teardown if
     # you actually need to roll back past this revision.
-    pass

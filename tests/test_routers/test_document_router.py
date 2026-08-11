@@ -1,4 +1,3 @@
-
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
@@ -13,7 +12,6 @@ from app.core.factories import (
 from app.main import app
 from app.models.enums import DocumentType, ValidationStatus
 from app.schemas.document import DocumentResponse
-
 
 # ============================================================
 # Helpers
@@ -72,9 +70,7 @@ async def test_upload_document_success(
 
     service = MagicMock()
 
-    service.upload_document_metadata = AsyncMock(
-        return_value=document_response
-    )
+    service.upload_document_metadata = AsyncMock(return_value=document_response)
 
     _override_document_service(service)
 
@@ -260,24 +256,18 @@ async def test_request_document_validation_success(
 
     service = MagicMock()
 
-    service.check_all_document_types_uploaded = AsyncMock(
-        return_value=True
-    )
+    service.check_all_document_types_uploaded = AsyncMock(return_value=True)
 
     application_repository = MagicMock()
     student_repository = MagicMock()
 
-    app.dependency_overrides[get_document_service] = (
-        lambda: service
+    app.dependency_overrides[get_document_service] = lambda: service
+
+    app.dependency_overrides[get_application_repository] = lambda: (
+        application_repository
     )
 
-    app.dependency_overrides[get_application_repository] = (
-        lambda: application_repository
-    )
-
-    app.dependency_overrides[get_student_repository] = (
-        lambda: student_repository
-    )
+    app.dependency_overrides[get_student_repository] = lambda: student_repository
 
     workflow_result = {
         "status": "completed",
@@ -286,21 +276,15 @@ async def test_request_document_validation_success(
 
     try:
         # Patch the class where the router uses it.
-        with patch(
-            "app.routers.document.DocumentValidationWorkflow"
-        ) as workflow_class:
-
+        with patch("app.routers.document.DocumentValidationWorkflow") as workflow_class:
             workflow = MagicMock()
 
-            workflow.run = AsyncMock(
-                return_value=workflow_result
-            )
+            workflow.run = AsyncMock(return_value=workflow_result)
 
             workflow_class.return_value = workflow
 
             response = await client.post(
-                f"/documents/applications/"
-                f"{test_application.id}/documents/validate",
+                f"/documents/applications/{test_application.id}/documents/validate",
                 headers={
                     "Authorization": f"Bearer {token}",
                 },
@@ -338,9 +322,7 @@ async def test_request_document_validation_success(
         verbose=False,
     )
 
-    workflow.run.assert_awaited_once_with(
-        application_id=test_application.id
-    )
+    workflow.run.assert_awaited_once_with(application_id=test_application.id)
 
 
 @pytest.mark.asyncio
@@ -353,16 +335,13 @@ async def test_request_document_validation_returns_400_when_not_all_documents_up
 
     service = MagicMock()
 
-    service.check_all_document_types_uploaded = AsyncMock(
-        return_value=False
-    )
+    service.check_all_document_types_uploaded = AsyncMock(return_value=False)
 
     _override_document_service(service)
 
     try:
         response = await client.post(
-            f"/documents/applications/"
-            f"{test_application.id}/documents/validate",
+            f"/documents/applications/{test_application.id}/documents/validate",
             headers={
                 "Authorization": f"Bearer {token}",
             },
@@ -372,9 +351,7 @@ async def test_request_document_validation_returns_400_when_not_all_documents_up
 
     assert response.status_code == 400
 
-    assert response.json()["detail"] == (
-        "All document types not uploaded"
-    )
+    assert response.json()["detail"] == ("All document types not uploaded")
 
     service.check_all_document_types_uploaded.assert_awaited_once_with(
         test_application.id
@@ -387,8 +364,7 @@ async def test_request_document_validation_requires_authentication(
     test_application,
 ):
     response = await client.post(
-        f"/documents/applications/"
-        f"{test_application.id}/documents/validate",
+        f"/documents/applications/{test_application.id}/documents/validate",
     )
 
     assert response.status_code == 403
@@ -400,8 +376,7 @@ async def test_request_document_validation_rejects_invalid_token(
     test_application,
 ):
     response = await client.post(
-        f"/documents/applications/"
-        f"{test_application.id}/documents/validate",
+        f"/documents/applications/{test_application.id}/documents/validate",
         headers={
             "Authorization": "Bearer invalid-token",
         },
@@ -425,4 +400,3 @@ async def test_request_document_validation_rejects_invalid_application_id(
     )
 
     assert response.status_code == 422
-

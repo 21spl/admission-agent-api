@@ -1,16 +1,14 @@
-
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from fastapi import HTTPException
+import pytest
 
 from app.core.factories import get_shortlisting_service
 from app.main import app
 
-
 # ============================================================
 # Helpers
 # ============================================================
+
 
 async def _get_officer_token(client, test_officer):
     response = await client.post(
@@ -29,6 +27,7 @@ async def _get_officer_token(client, test_officer):
 # ============================================================
 # POST /admin/rounds/{round_number}/shortlist
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_trigger_shortlisting_round_requires_authentication(
@@ -95,9 +94,7 @@ async def test_trigger_shortlisting_round_success(
         }
     )
 
-    app.dependency_overrides[
-        get_shortlisting_service
-    ] = lambda: shortlisting_service
+    app.dependency_overrides[get_shortlisting_service] = lambda: shortlisting_service
 
     try:
         response = await client.post(
@@ -120,9 +117,7 @@ async def test_trigger_shortlisting_round_success(
         "offers_created": 25,
     }
 
-    shortlisting_service.run_shortlisting_round.assert_awaited_once_with(
-        1
-    )
+    shortlisting_service.run_shortlisting_round.assert_awaited_once_with(1)
 
 
 @pytest.mark.asyncio
@@ -144,9 +139,7 @@ async def test_trigger_shortlisting_round_passes_round_number_to_service(
         }
     )
 
-    app.dependency_overrides[
-        get_shortlisting_service
-    ] = lambda: shortlisting_service
+    app.dependency_overrides[get_shortlisting_service] = lambda: shortlisting_service
 
     try:
         response = await client.post(
@@ -163,9 +156,7 @@ async def test_trigger_shortlisting_round_passes_round_number_to_service(
 
     assert response.status_code == 200
 
-    shortlisting_service.run_shortlisting_round.assert_awaited_once_with(
-        3
-    )
+    shortlisting_service.run_shortlisting_round.assert_awaited_once_with(3)
 
 
 @pytest.mark.asyncio
@@ -181,14 +172,10 @@ async def test_trigger_shortlisting_round_converts_value_error_to_400(
     shortlisting_service = MagicMock()
 
     shortlisting_service.run_shortlisting_round = AsyncMock(
-        side_effect=ValueError(
-            "Shortlisting round 1 has already been completed."
-        )
+        side_effect=ValueError("Shortlisting round 1 has already been completed.")
     )
 
-    app.dependency_overrides[
-        get_shortlisting_service
-    ] = lambda: shortlisting_service
+    app.dependency_overrides[get_shortlisting_service] = lambda: shortlisting_service
 
     try:
         response = await client.post(
@@ -209,9 +196,7 @@ async def test_trigger_shortlisting_round_converts_value_error_to_400(
         "Shortlisting round 1 has already been completed."
     )
 
-    shortlisting_service.run_shortlisting_round.assert_awaited_once_with(
-        1
-    )
+    shortlisting_service.run_shortlisting_round.assert_awaited_once_with(1)
 
 
 @pytest.mark.asyncio
@@ -235,9 +220,7 @@ async def test_trigger_shortlisting_round_propagates_unhandled_exception(
         side_effect=RuntimeError("Database failure")
     )
 
-    app.dependency_overrides[
-        get_shortlisting_service
-    ] = lambda: shortlisting_service
+    app.dependency_overrides[get_shortlisting_service] = lambda: shortlisting_service
 
     try:
         with pytest.raises(RuntimeError, match="Database failure"):
@@ -258,6 +241,7 @@ async def test_trigger_shortlisting_round_propagates_unhandled_exception(
 # Boundary / path parameter checks
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_trigger_shortlisting_round_accepts_zero_as_integer(
     client,
@@ -266,7 +250,7 @@ async def test_trigger_shortlisting_round_accepts_zero_as_integer(
     """
     This test documents the current router behavior:
     round_number is only typed as int, so zero is accepted by FastAPI.
-    
+
     If your business rule says rounds must be 1, 2, or 3,
     enforce that in the route/service and change this test.
     """
@@ -285,9 +269,7 @@ async def test_trigger_shortlisting_round_accepts_zero_as_integer(
         }
     )
 
-    app.dependency_overrides[
-        get_shortlisting_service
-    ] = lambda: shortlisting_service
+    app.dependency_overrides[get_shortlisting_service] = lambda: shortlisting_service
 
     try:
         response = await client.post(
@@ -304,7 +286,4 @@ async def test_trigger_shortlisting_round_accepts_zero_as_integer(
 
     assert response.status_code == 200
 
-    shortlisting_service.run_shortlisting_round.assert_awaited_once_with(
-        0
-    )
-
+    shortlisting_service.run_shortlisting_round.assert_awaited_once_with(0)

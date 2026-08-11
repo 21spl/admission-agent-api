@@ -1,0 +1,4 @@
+streamlit>=1.38
+requests>=2.31
+
+ruff==0.12.7

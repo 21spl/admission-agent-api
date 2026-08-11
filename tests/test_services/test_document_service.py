@@ -1,11 +1,17 @@
 # tests/test_track_a/test_document_service.py
 import uuid
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from fastapi import HTTPException
 
-from app.core.factories import get_document_service, get_application_service
-from app.models.enums import DocumentType, ValidationStatus, ApplicationStatus, AllowedFileType
+from app.core.factories import get_application_service, get_document_service
+from app.models.enums import (
+    AllowedFileType,
+    ApplicationStatus,
+    DocumentType,
+    ValidationStatus,
+)
 
 
 def _mock_storage():
@@ -19,6 +25,7 @@ def _mock_storage():
 
 # ---------------- upload_document_metadata ----------------
 
+
 @pytest.mark.asyncio
 async def test_upload_document_raises_404_when_no_application(db_session, test_student):
     application_service = get_application_service(db_session)
@@ -27,19 +34,29 @@ async def test_upload_document_raises_404_when_no_application(db_session, test_s
     with _mock_storage():
         with pytest.raises(HTTPException) as exc_info:
             await document_service.upload_document_metadata(
-                test_student, DocumentType.ID_CARD, "id.pdf", b"fake bytes", AllowedFileType.PDF,
+                test_student,
+                DocumentType.ID_CARD,
+                "id.pdf",
+                b"fake bytes",
+                AllowedFileType.PDF,
             )
     assert exc_info.value.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_upload_document_creates_new_pending_document(db_session, test_student, test_application):
+async def test_upload_document_creates_new_pending_document(
+    db_session, test_student, test_application
+):
     application_service = get_application_service(db_session)
     document_service = get_document_service(db_session, application_service)
 
     with _mock_storage():
         doc = await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"fake bytes", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"fake bytes",
+            AllowedFileType.PDF,
         )
 
     assert doc.validation_status == ValidationStatus.PENDING.value
@@ -55,7 +72,11 @@ async def test_upload_document_advances_application_status_to_docs_pending(
 
     with _mock_storage():
         await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
 
     application = await application_service.get_application_by_id(test_application.id)
@@ -71,23 +92,36 @@ async def test_upload_document_reupload_overwrites_same_row_and_resets_pending(
 
     with _mock_storage():
         first = await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id_v1.pdf", b"v1", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id_v1.pdf",
+            b"v1",
+            AllowedFileType.PDF,
         )
         # simulate it having been validated before the re-upload
         first.validation_status = ValidationStatus.VALID.value
         await db_session.flush()
 
         second = await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id_v2.pdf", b"v2", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id_v2.pdf",
+            b"v2",
+            AllowedFileType.PDF,
         )
 
     assert first.id == second.id  # same row, not a duplicate
-    assert second.validation_status == ValidationStatus.PENDING.value  # reset, not still VALID
+    assert (
+        second.validation_status == ValidationStatus.PENDING.value
+    )  # reset, not still VALID
 
 
 @pytest.mark.asyncio
-async def test_upload_document_raises_502_on_storage_failure(db_session, test_student, test_application):
+async def test_upload_document_raises_502_on_storage_failure(
+    db_session, test_student, test_application
+):
     from app.storage import StorageUploadError
+
     application_service = get_application_service(db_session)
     document_service = get_document_service(db_session, application_service)
 
@@ -98,21 +132,32 @@ async def test_upload_document_raises_502_on_storage_failure(db_session, test_st
     ):
         with pytest.raises(HTTPException) as exc_info:
             await document_service.upload_document_metadata(
-                test_student, DocumentType.ID_CARD, "id.pdf", b"fake bytes", AllowedFileType.PDF,
+                test_student,
+                DocumentType.ID_CARD,
+                "id.pdf",
+                b"fake bytes",
+                AllowedFileType.PDF,
             )
     assert exc_info.value.status_code == 502
 
 
 # ---------------- get_document_by_application_id_and_type ----------------
 
+
 @pytest.mark.asyncio
-async def test_get_document_by_type_finds_uploaded_document(db_session, test_student, test_application):
+async def test_get_document_by_type_finds_uploaded_document(
+    db_session, test_student, test_application
+):
     application_service = get_application_service(db_session)
     document_service = get_document_service(db_session, application_service)
 
     with _mock_storage():
         await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
 
     found = await document_service.get_document_by_application_id_and_type(
@@ -122,7 +167,9 @@ async def test_get_document_by_type_finds_uploaded_document(db_session, test_stu
 
 
 @pytest.mark.asyncio
-async def test_get_document_by_type_returns_none_when_absent(db_session, test_application):
+async def test_get_document_by_type_returns_none_when_absent(
+    db_session, test_application
+):
     application_service = get_application_service(db_session)
     document_service = get_document_service(db_session, application_service)
 
@@ -134,6 +181,7 @@ async def test_get_document_by_type_returns_none_when_absent(db_session, test_ap
 
 # ---------------- list_application_documents ----------------
 
+
 @pytest.mark.asyncio
 async def test_list_application_documents_empty_initially(db_session, test_application):
     application_service = get_application_service(db_session)
@@ -143,6 +191,7 @@ async def test_list_application_documents_empty_initially(db_session, test_appli
 
 
 # ---------------- get_document_bytes ----------------
+
 
 @pytest.mark.asyncio
 async def test_get_document_bytes_raises_404_for_unknown_document(db_session):
@@ -155,32 +204,47 @@ async def test_get_document_bytes_raises_404_for_unknown_document(db_session):
 
 
 @pytest.mark.asyncio
-async def test_get_document_bytes_raises_502_on_fetch_failure(db_session, test_student, test_application):
+async def test_get_document_bytes_raises_502_on_fetch_failure(
+    db_session, test_student, test_application
+):
     from app.storage import StorageFetchError
+
     application_service = get_application_service(db_session)
     document_service = get_document_service(db_session, application_service)
 
     with _mock_storage():
         doc = await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
 
-    with patch(
-        "app.services.document_service.storage_manager.fetch_document",
-        new_callable=AsyncMock, side_effect=StorageFetchError,
+    with (
+        patch(
+            "app.services.document_service.storage_manager.fetch_document",
+            new_callable=AsyncMock,
+            side_effect=StorageFetchError,
+        ),
+        pytest.raises(HTTPException) as exc_info,
     ):
-        with pytest.raises(HTTPException) as exc_info:
-            await document_service.get_document_bytes(doc.id)
+        await document_service.get_document_bytes(doc.id)
     assert exc_info.value.status_code == 502
 
 
 # ---------------- check_all_document_types_uploaded ----------------
 
+
 @pytest.mark.asyncio
-async def test_check_all_document_types_uploaded_false_initially(db_session, test_application):
+async def test_check_all_document_types_uploaded_false_initially(
+    db_session, test_application
+):
     application_service = get_application_service(db_session)
     document_service = get_document_service(db_session, application_service)
-    result = await document_service.check_all_document_types_uploaded(test_application.id)
+    result = await document_service.check_all_document_types_uploaded(
+        test_application.id
+    )
     assert result is False
 
 
@@ -193,13 +257,23 @@ async def test_check_all_document_types_uploaded_true_when_both_present(
 
     with _mock_storage():
         await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
         await document_service.upload_document_metadata(
-            test_student, DocumentType.CLASS12_MARKSHEET, "marks.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.CLASS12_MARKSHEET,
+            "marks.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
 
-    result = await document_service.check_all_document_types_uploaded(test_application.id)
+    result = await document_service.check_all_document_types_uploaded(
+        test_application.id
+    )
     assert result is True
 
     application = await application_service.get_application_by_id(test_application.id)
@@ -207,6 +281,7 @@ async def test_check_all_document_types_uploaded_true_when_both_present(
 
 
 # ---------------- mark_auto_validated / rejected / pending ----------------
+
 
 @pytest.mark.asyncio
 async def test_mark_auto_validated_sets_documents_valid_and_application_validated(
@@ -217,10 +292,16 @@ async def test_mark_auto_validated_sets_documents_valid_and_application_validate
 
     with _mock_storage():
         await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
 
-    await document_service.mark_auto_validated(test_application.id, [DocumentType.ID_CARD.value])
+    await document_service.mark_auto_validated(
+        test_application.id, [DocumentType.ID_CARD.value]
+    )
 
     docs = await document_service.list_application_documents(test_application.id)
     assert docs[0].validation_status == ValidationStatus.VALID.value
@@ -241,13 +322,19 @@ async def test_mark_auto_validated_raises_404_for_unknown_application(db_session
 
 
 @pytest.mark.asyncio
-async def test_mark_auto_rejected_sets_reason_and_invalid(db_session, test_student, test_application):
+async def test_mark_auto_rejected_sets_reason_and_invalid(
+    db_session, test_student, test_application
+):
     application_service = get_application_service(db_session)
     document_service = get_document_service(db_session, application_service)
 
     with _mock_storage():
         await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
 
     await document_service.mark_auto_rejected(
@@ -272,16 +359,24 @@ async def test_mark_auto_pending_leaves_documents_pending_but_flags_application(
 
     with _mock_storage():
         await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
 
     await document_service.mark_auto_pending(
-        test_application.id, flags=2, issues="Low OCR confidence on DOB field",
+        test_application.id,
+        flags=2,
+        issues="Low OCR confidence on DOB field",
         doc_types=[DocumentType.ID_CARD.value],
     )
 
     docs = await document_service.list_application_documents(test_application.id)
-    assert docs[0].validation_status == ValidationStatus.PENDING.value  # unchanged by design
+    assert (
+        docs[0].validation_status == ValidationStatus.PENDING.value
+    )  # unchanged by design
 
     application = await application_service.get_application_by_id(test_application.id)
     assert application.status == ApplicationStatus.PENDING_REVIEW
@@ -290,6 +385,7 @@ async def test_mark_auto_pending_leaves_documents_pending_but_flags_application(
 
 
 # ---------------- get_download_link ----------------
+
 
 @pytest.mark.asyncio
 async def test_get_download_link_raises_404_for_unknown_document(db_session):
@@ -303,18 +399,25 @@ async def test_get_download_link_raises_404_for_unknown_document(db_session):
 
 
 @pytest.mark.asyncio
-async def test_get_download_link_returns_presigned_url(db_session, test_student, test_application):
+async def test_get_download_link_returns_presigned_url(
+    db_session, test_student, test_application
+):
     application_service = get_application_service(db_session)
     document_service = get_document_service(db_session, application_service)
 
     with _mock_storage():
         doc = await document_service.upload_document_metadata(
-            test_student, DocumentType.ID_CARD, "id.pdf", b"x", AllowedFileType.PDF,
+            test_student,
+            DocumentType.ID_CARD,
+            "id.pdf",
+            b"x",
+            AllowedFileType.PDF,
         )
 
     with patch(
         "app.services.document_service.storage_manager.generate_presigned_url",
-        new_callable=AsyncMock, return_value="https://fake-presigned-url.example.com/id.pdf",
+        new_callable=AsyncMock,
+        return_value="https://fake-presigned-url.example.com/id.pdf",
     ):
         link = await document_service.get_download_link(doc.id)
 

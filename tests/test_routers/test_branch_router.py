@@ -1,17 +1,11 @@
-
-
 import uuid
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from app.core.factories import get_branch_service
-from app.main import app
-
 
 # ============================================================
 # Helpers
 # ============================================================
+
 
 async def _get_officer_token(client, email, password):
     response = await client.post(
@@ -31,6 +25,7 @@ async def _get_officer_token(client, email, password):
 # GET /branches
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_list_all_branches_success(
     client,
@@ -45,10 +40,7 @@ async def test_list_all_branches_success(
     assert isinstance(data, list)
     assert len(data) >= 1
 
-    branch = next(
-        item for item in data
-        if item["id"] == str(test_branch.id)
-    )
+    branch = next(item for item in data if item["id"] == str(test_branch.id))
 
     assert branch["name"] == test_branch.name
     assert branch["code"] == test_branch.code
@@ -67,14 +59,13 @@ async def test_list_all_branches_does_not_require_authentication(
 # GET /branches/{branch_id}
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_get_single_branch_success(
     client,
     test_branch,
 ):
-    response = await client.get(
-        f"/branches/{test_branch.id}"
-    )
+    response = await client.get(f"/branches/{test_branch.id}")
 
     assert response.status_code == 200
 
@@ -91,9 +82,7 @@ async def test_get_single_branch_returns_404_for_unknown_branch(
 ):
     branch_id = uuid.uuid4()
 
-    response = await client.get(
-        f"/branches/{branch_id}"
-    )
+    response = await client.get(f"/branches/{branch_id}")
 
     assert response.status_code == 404
 
@@ -102,9 +91,7 @@ async def test_get_single_branch_returns_404_for_unknown_branch(
 async def test_get_single_branch_rejects_invalid_uuid(
     client,
 ):
-    response = await client.get(
-        "/branches/not-a-uuid"
-    )
+    response = await client.get("/branches/not-a-uuid")
 
     assert response.status_code == 422
 
@@ -114,9 +101,7 @@ async def test_get_single_branch_does_not_require_authentication(
     client,
     test_branch,
 ):
-    response = await client.get(
-        f"/branches/{test_branch.id}"
-    )
+    response = await client.get(f"/branches/{test_branch.id}")
 
     assert response.status_code == 200
 
@@ -124,6 +109,7 @@ async def test_get_single_branch_does_not_require_authentication(
 # ============================================================
 # POST /branches
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_create_branch_requires_authentication(
@@ -172,9 +158,9 @@ async def test_create_branch_success(
     using the same fields as your Officer model.
     """
 
+    from app.core.security import hash_password
     from app.models.domain import Officer
     from app.models.enums import OfficerRole
-    from app.core.security import hash_password
 
     officer = Officer(
         name="Test Admin",
@@ -232,6 +218,7 @@ async def test_create_branch_rejects_invalid_request(
 # PATCH /branches/{branch_id}
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_update_branch_requires_authentication(
     client,
@@ -270,9 +257,9 @@ async def test_update_branch_success(
     db_session,
     test_branch,
 ):
+    from app.core.security import hash_password
     from app.models.domain import Officer
     from app.models.enums import OfficerRole
-    from app.core.security import hash_password
 
     officer = Officer(
         name="Test Admin",
@@ -313,9 +300,9 @@ async def test_update_branch_returns_404_for_unknown_branch(
     client,
     db_session,
 ):
+    from app.core.security import hash_password
     from app.models.domain import Officer
     from app.models.enums import OfficerRole
-    from app.core.security import hash_password
 
     officer = Officer(
         name="Test Admin",
@@ -344,4 +331,3 @@ async def test_update_branch_returns_404_for_unknown_branch(
     )
 
     assert response.status_code == 404
-

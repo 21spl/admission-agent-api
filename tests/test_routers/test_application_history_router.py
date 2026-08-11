@@ -1,5 +1,3 @@
-
-
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -10,10 +8,10 @@ from app.core.factories import get_application_history_service
 from app.main import app
 from app.models.enums import ApplicationStatus
 
-
 # ============================================================
 # Helpers
 # ============================================================
+
 
 async def _get_student_token(client, test_student):
     response = await client.post(
@@ -44,9 +42,7 @@ async def _get_officer_token(client, test_officer):
 
 
 def _override_history_service(service):
-    app.dependency_overrides[
-        get_application_history_service
-    ] = lambda: service
+    app.dependency_overrides[get_application_history_service] = lambda: service
 
 
 def _clear_history_service_override():
@@ -60,13 +56,12 @@ def _clear_history_service_override():
 # GET /applications/history/me
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_get_my_application_audit_trail_requires_authentication(
     client,
 ):
-    response = await client.get(
-        "/applications/history/me"
-    )
+    response = await client.get("/applications/history/me")
 
     assert response.status_code == 403
 
@@ -97,9 +92,7 @@ async def test_get_my_application_audit_trail_returns_empty_list(
 
     history_service = MagicMock()
 
-    history_service.get_history_for_student = AsyncMock(
-        return_value=[]
-    )
+    history_service.get_history_for_student = AsyncMock(return_value=[])
 
     _override_history_service(history_service)
 
@@ -116,9 +109,7 @@ async def test_get_my_application_audit_trail_returns_empty_list(
     assert response.status_code == 200
     assert response.json() == []
 
-    history_service.get_history_for_student.assert_awaited_once_with(
-        test_student
-    )
+    history_service.get_history_for_student.assert_awaited_once_with(test_student)
 
 
 @pytest.mark.asyncio
@@ -184,14 +175,13 @@ async def test_get_my_application_audit_trail_returns_history(
     assert data[1]["id"] == str(history_id_2)
     assert data[1]["application_id"] == str(application_id)
 
-    history_service.get_history_for_student.assert_awaited_once_with(
-        test_student
-    )
+    history_service.get_history_for_student.assert_awaited_once_with(test_student)
 
 
 # ============================================================
 # Student endpoint must not accept officer credentials
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_get_my_application_audit_trail_rejects_officer(
@@ -217,15 +207,14 @@ async def test_get_my_application_audit_trail_rejects_officer(
 # GET /applications/history/application/{application_id}
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_officer_get_application_audit_trail_requires_authentication(
     client,
 ):
     application_id = uuid.uuid4()
 
-    response = await client.get(
-        f"/applications/history/application/{application_id}"
-    )
+    response = await client.get(f"/applications/history/application/{application_id}")
 
     assert response.status_code == 403
 
@@ -280,9 +269,7 @@ async def test_officer_get_application_audit_trail_returns_empty_list(
 
     history_service = MagicMock()
 
-    history_service.get_history_for_officer = AsyncMock(
-        return_value=[]
-    )
+    history_service.get_history_for_officer = AsyncMock(return_value=[])
 
     _override_history_service(history_service)
 
@@ -299,9 +286,7 @@ async def test_officer_get_application_audit_trail_returns_empty_list(
     assert response.status_code == 200
     assert response.json() == []
 
-    history_service.get_history_for_officer.assert_awaited_once_with(
-        application_id
-    )
+    history_service.get_history_for_officer.assert_awaited_once_with(application_id)
 
 
 @pytest.mark.asyncio
@@ -329,9 +314,7 @@ async def test_officer_get_application_audit_trail_returns_history(
 
     history_service = MagicMock()
 
-    history_service.get_history_for_officer = AsyncMock(
-        return_value=[history]
-    )
+    history_service.get_history_for_officer = AsyncMock(return_value=[history])
 
     _override_history_service(history_service)
 
@@ -353,14 +336,13 @@ async def test_officer_get_application_audit_trail_returns_history(
     assert data[0]["id"] == str(history_id)
     assert data[0]["application_id"] == str(application_id)
 
-    history_service.get_history_for_officer.assert_awaited_once_with(
-        application_id
-    )
+    history_service.get_history_for_officer.assert_awaited_once_with(application_id)
 
 
 # ============================================================
 # Officer endpoint must reject student credentials
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_officer_get_application_audit_trail_rejects_student(

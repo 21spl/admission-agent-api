@@ -1,5 +1,3 @@
-import uuid
-
 from datetime import date, timedelta
 
 import pytest
@@ -8,10 +6,10 @@ from app.core.security import hash_password
 from app.models.domain import Officer
 from app.models.enums import OfficerRole
 
-
 # ============================================================
 # Student Registration
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_register_student_success(client):
@@ -121,6 +119,7 @@ async def test_register_student_rejects_invalid_request(client):
 # Student Login
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_login_student_success(
     client,
@@ -189,6 +188,7 @@ async def test_login_student_rejects_invalid_request(client):
 # ============================================================
 # Officer Login
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_login_officer_success(
@@ -273,6 +273,3 @@ async def test_login_officer_rejects_invalid_request(client):
     )
 
     assert response.status_code == 422
-
-
-

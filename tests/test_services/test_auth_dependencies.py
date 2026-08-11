@@ -1,27 +1,24 @@
-
-
 import uuid
 from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
 import jwt
 import pytest
 from fastapi import HTTPException, UploadFile
-from unittest.mock import MagicMock
 
 from app.core.config import settings
 from app.core.dependencies import (
     decode_token_payload,
-    get_current_student,
     get_current_officer,
+    get_current_student,
     validate_uploaded_file_type,
-    OFFER_TOKEN_TTL_HOURS,
 )
 from app.models.enums import AllowedFileType, OfficerRole
-
 
 # ============================================================
 # decode_token_payload
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_decode_token_payload_returns_valid_payload():
@@ -85,6 +82,7 @@ async def test_decode_token_payload_raises_401_for_expired_token():
 # get_current_student
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_get_current_student_returns_student(
     db_session,
@@ -120,10 +118,7 @@ async def test_get_current_student_rejects_officer_token(
         )
 
     assert exc_info.value.status_code == 403
-    assert (
-        exc_info.value.detail
-        == "Access denied. Student account scope required."
-    )
+    assert exc_info.value.detail == "Access denied. Student account scope required."
 
 
 @pytest.mark.asyncio
@@ -148,6 +143,7 @@ async def test_get_current_student_raises_404_when_student_not_found(
 # ============================================================
 # get_current_officer
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_get_current_officer_returns_officer(
@@ -196,8 +192,7 @@ async def test_get_current_officer_rejects_student_token(
 
     assert exc_info.value.status_code == 403
     assert (
-        exc_info.value.detail
-        == "Access denied. Officer administrative scope required."
+        exc_info.value.detail == "Access denied. Officer administrative scope required."
     )
 
 
@@ -217,15 +212,13 @@ async def test_get_current_officer_raises_404_when_officer_not_found(
         )
 
     assert exc_info.value.status_code == 404
-    assert (
-        exc_info.value.detail
-        == "Administrative record profile not found."
-    )
+    assert exc_info.value.detail == "Administrative record profile not found."
 
 
 # ============================================================
 # validate_uploaded_file_type
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_validate_uploaded_file_type_accepts_pdf():
@@ -259,17 +252,3 @@ async def test_validate_uploaded_file_type_rejects_unsupported_type():
 
     assert exc_info.value.status_code == 415
     assert "Unsupported file type" in exc_info.value.detail
-
-
-
-
-
-
-
-
-
-
-
-
-
-

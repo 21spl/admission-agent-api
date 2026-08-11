@@ -1,4 +1,3 @@
-
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -13,10 +12,10 @@ from app.core.factories import (
 from app.main import app
 from app.models.enums import ApplicationStatus, DocumentType
 
-
 # ============================================================
 # Helpers
 # ============================================================
+
 
 async def _get_officer_token(client, test_officer):
     response = await client.post(
@@ -45,13 +44,12 @@ def _clear_dependency_overrides(*dependencies):
 # GET /admin/document-reviews/
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_list_pending_reviews_requires_authentication(
     client,
 ):
-    response = await client.get(
-        "/admin/document-reviews/"
-    )
+    response = await client.get("/admin/document-reviews/")
 
     assert response.status_code == 403
 
@@ -81,9 +79,7 @@ async def test_list_pending_reviews_returns_empty_list(
     )
 
     application_repository = MagicMock()
-    application_repository.list_by_status = AsyncMock(
-        return_value=[]
-    )
+    application_repository.list_by_status = AsyncMock(return_value=[])
 
     document_service = MagicMock()
 
@@ -167,9 +163,7 @@ async def test_list_pending_reviews_returns_application_with_document_links(
 
     application_repository = MagicMock()
 
-    application_repository.list_by_status = AsyncMock(
-        return_value=[application]
-    )
+    application_repository.list_by_status = AsyncMock(return_value=[application])
 
     document_service = MagicMock()
 
@@ -217,13 +211,9 @@ async def test_list_pending_reviews_returns_application_with_document_links(
     assert review["validation_flags"] == 0
     assert review["validation_issues"] is None
 
-    assert review["class12_marksheet"] == (
-        "https://storage.test/marksheet.pdf"
-    )
+    assert review["class12_marksheet"] == ("https://storage.test/marksheet.pdf")
 
-    assert review["id_card"] == (
-        "https://storage.test/id-card.pdf"
-    )
+    assert review["id_card"] == ("https://storage.test/id-card.pdf")
 
     application_repository.list_by_status.assert_awaited_once_with(
         ApplicationStatus.PENDING_REVIEW
@@ -231,13 +221,9 @@ async def test_list_pending_reviews_returns_application_with_document_links(
 
     assert document_service.get_download_link.await_count == 2
 
-    document_service.get_download_link.assert_any_await(
-        marksheet_doc.id
-    )
+    document_service.get_download_link.assert_any_await(marksheet_doc.id)
 
-    document_service.get_download_link.assert_any_await(
-        id_card_doc.id
-    )
+    document_service.get_download_link.assert_any_await(id_card_doc.id)
 
 
 @pytest.mark.asyncio
@@ -268,9 +254,7 @@ async def test_list_pending_reviews_handles_missing_documents(
 
     application_repository = MagicMock()
 
-    application_repository.list_by_status = AsyncMock(
-        return_value=[application]
-    )
+    application_repository.list_by_status = AsyncMock(return_value=[application])
 
     document_service = MagicMock()
 
@@ -319,6 +303,7 @@ async def test_list_pending_reviews_handles_missing_documents(
 # ============================================================
 # POST /admin/document-reviews/{application_id}/decision
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_submit_review_decision_requires_authentication(
@@ -410,9 +395,7 @@ async def test_submit_review_decision_returns_404_when_application_not_found(
 
     application_repository = MagicMock()
 
-    application_repository.get_by_id = AsyncMock(
-        return_value=None
-    )
+    application_repository.get_by_id = AsyncMock(return_value=None)
 
     _override_dependency(
         get_application_repository,
@@ -442,9 +425,7 @@ async def test_submit_review_decision_returns_404_when_application_not_found(
         "No pending review found for this application."
     )
 
-    application_repository.get_by_id.assert_awaited_once_with(
-        application_id
-    )
+    application_repository.get_by_id.assert_awaited_once_with(application_id)
 
 
 @pytest.mark.asyncio
@@ -464,9 +445,7 @@ async def test_submit_review_decision_returns_404_when_application_not_pending(
 
     application_repository = MagicMock()
 
-    application_repository.get_by_id = AsyncMock(
-        return_value=application
-    )
+    application_repository.get_by_id = AsyncMock(return_value=application)
 
     _override_dependency(
         get_application_repository,
@@ -499,6 +478,7 @@ async def test_submit_review_decision_returns_404_when_application_not_pending(
 # APPROVE
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_submit_review_decision_approve_success(
     client,
@@ -517,9 +497,7 @@ async def test_submit_review_decision_approve_success(
 
     application_repository = MagicMock()
 
-    application_repository.get_by_id = AsyncMock(
-        return_value=application
-    )
+    application_repository.get_by_id = AsyncMock(return_value=application)
 
     admin_review_service = MagicMock()
 
@@ -558,9 +536,7 @@ async def test_submit_review_decision_approve_success(
     assert data["status"] == "resolved"
     assert data["application_id"] == str(application_id)
 
-    application_repository.get_by_id.assert_awaited_once_with(
-        application_id
-    )
+    application_repository.get_by_id.assert_awaited_once_with(application_id)
 
     admin_review_service.validate_application_manually.assert_awaited_once_with(
         application_id
@@ -570,6 +546,7 @@ async def test_submit_review_decision_approve_success(
 # ============================================================
 # REJECT
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_submit_review_decision_reject_success(
@@ -589,9 +566,7 @@ async def test_submit_review_decision_reject_success(
 
     application_repository = MagicMock()
 
-    application_repository.get_by_id = AsyncMock(
-        return_value=application
-    )
+    application_repository.get_by_id = AsyncMock(return_value=application)
 
     admin_review_service = MagicMock()
 
@@ -630,9 +605,7 @@ async def test_submit_review_decision_reject_success(
     assert data["status"] == "resolved"
     assert data["application_id"] == str(application_id)
 
-    application_repository.get_by_id.assert_awaited_once_with(
-        application_id
-    )
+    application_repository.get_by_id.assert_awaited_once_with(application_id)
 
     admin_review_service.reject_application_manually.assert_awaited_once_with(
         application_id
@@ -642,6 +615,7 @@ async def test_submit_review_decision_reject_success(
 # ============================================================
 # APPROVE / REJECT MUST NOT CALL THE OTHER PATH
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_approve_decision_does_not_call_reject(
@@ -661,9 +635,7 @@ async def test_approve_decision_does_not_call_reject(
 
     application_repository = MagicMock()
 
-    application_repository.get_by_id = AsyncMock(
-        return_value=application
-    )
+    application_repository.get_by_id = AsyncMock(return_value=application)
 
     admin_review_service = MagicMock()
 
@@ -723,9 +695,7 @@ async def test_reject_decision_does_not_call_approve(
 
     application_repository = MagicMock()
 
-    application_repository.get_by_id = AsyncMock(
-        return_value=application
-    )
+    application_repository.get_by_id = AsyncMock(return_value=application)
 
     admin_review_service = MagicMock()
 
@@ -765,4 +735,3 @@ async def test_reject_decision_does_not_call_approve(
     )
 
     admin_review_service.validate_application_manually.assert_not_awaited()
-

@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -7,6 +6,7 @@ import pytest
 from app.models.domain import Student
 from app.models.enums import ApplicationStatus, OfferStatus
 from app.services.shortlisting.shortlisting_service import ShortlistingService
+
 
 def _scalar_result(rows):
     """
@@ -29,6 +29,7 @@ def _rows_result(rows):
     result.all.return_value = rows
     return result
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("round_number", [0, 4, -1, 100])
 async def test_run_shortlisting_round_rejects_invalid_round(
@@ -49,7 +50,6 @@ async def test_run_shortlisting_round_rejects_invalid_round(
         await service.run_shortlisting_round(round_number)
 
     db.execute.assert_not_called()
-
 
 
 @pytest.mark.asyncio
@@ -97,6 +97,7 @@ async def test_compute_remaining_seats():
         me_id: 40,
     }
 
+
 @pytest.mark.asyncio
 async def test_build_candidate_pool():
     db = MagicMock()
@@ -124,10 +125,12 @@ async def test_build_candidate_pool():
     db.execute = AsyncMock(
         side_effect=[
             _scalar_result([application]),
-            _rows_result([
-                (branch_1,),
-                (branch_2,),
-            ]),
+            _rows_result(
+                [
+                    (branch_1,),
+                    (branch_2,),
+                ]
+            ),
         ]
     )
 
@@ -155,6 +158,7 @@ async def test_build_candidate_pool():
         Student,
         student_id,
     )
+
 
 @pytest.mark.asyncio
 async def test_build_candidate_pool_skips_application_without_preferences():
@@ -185,6 +189,7 @@ async def test_build_candidate_pool_skips_application_without_preferences():
 
     db.get.assert_not_awaited()
 
+
 @pytest.mark.asyncio
 async def test_build_candidate_pool_skips_student_without_marks():
     db = MagicMock()
@@ -201,15 +206,15 @@ async def test_build_candidate_pool_skips_student_without_marks():
     db.execute = AsyncMock(
         side_effect=[
             _scalar_result([application]),
-            _rows_result([
-                (uuid.uuid4(),),
-            ]),
+            _rows_result(
+                [
+                    (uuid.uuid4(),),
+                ]
+            ),
         ]
     )
 
-    db.get = AsyncMock(
-        return_value=student
-    )
+    db.get = AsyncMock(return_value=student)
 
     service = ShortlistingService(
         db=db,
@@ -245,14 +250,10 @@ async def test_expire_stale_offer_with_first_preference_withdraws_application():
         ]
     )
 
-    db.get = AsyncMock(
-        return_value=application
-    )
+    db.get = AsyncMock(return_value=application)
 
     # select(ShortlistingPreference...).scalar(...)
-    db.scalar = AsyncMock(
-        return_value=branch_id
-    )
+    db.scalar = AsyncMock(return_value=branch_id)
 
     service = ShortlistingService(
         db=db,
@@ -275,6 +276,7 @@ async def test_expire_stale_offer_with_first_preference_withdraws_application():
     assert history.new_status == ApplicationStatus.WITHDRAWN
     assert history.changed_by == "SYSTEM:SHORTLISTING"
 
+
 @pytest.mark.asyncio
 async def test_expire_stale_offer_non_first_preference_carries_forward():
     db = MagicMock()
@@ -294,17 +296,11 @@ async def test_expire_stale_offer_non_first_preference_carries_forward():
     application.id = application_id
     application.status = ApplicationStatus.OFFER_MADE
 
-    db.execute = AsyncMock(
-        return_value=_scalar_result([offer])
-    )
+    db.execute = AsyncMock(return_value=_scalar_result([offer]))
 
-    db.get = AsyncMock(
-        return_value=application
-    )
+    db.get = AsyncMock(return_value=application)
 
-    db.scalar = AsyncMock(
-        return_value=first_preference_branch_id
-    )
+    db.scalar = AsyncMock(return_value=first_preference_branch_id)
 
     service = ShortlistingService(
         db=db,
@@ -321,7 +317,7 @@ async def test_expire_stale_offer_non_first_preference_carries_forward():
     history = db.add.call_args.args[0]
 
     assert history.application_id == application_id
-    assert history.old_status == ApplicationStatus.OFFER_MADE 
+    assert history.old_status == ApplicationStatus.OFFER_MADE
     assert history.new_status == ApplicationStatus.OFFER_EXPIRED
     assert history.changed_by == "SYSTEM:SHORTLISTING"
 
@@ -353,34 +349,34 @@ async def test_run_shortlisting_round_creates_offers():
     )
 
     # Round 1 should NOT expire previous offers.
-    with patch.object(
-        service,
-        "_compute_remaining_seats",
-        new=AsyncMock(
-            return_value={
-                branch_id: 1,
-            }
+    with (
+        patch.object(
+            service,
+            "_compute_remaining_seats",
+            new=AsyncMock(
+                return_value={
+                    branch_id: 1,
+                }
+            ),
+        ) as compute_seats,
+        patch.object(
+            service,
+            "_build_candidate_pool",
+            new=AsyncMock(return_value=[]),
+        ) as build_candidates,
+        patch(
+            "app.services.shortlisting.shortlisting_service.run_deferred_acceptance",
+            return_value=assignments,
         ),
-    ) as compute_seats, patch.object(
-        service,
-        "_build_candidate_pool",
-        new=AsyncMock(return_value=[]),
-    ) as build_candidates, patch(
-        "app.services.shortlisting.shortlisting_service.run_deferred_acceptance",
-        return_value=assignments,
     ):
         # Branch query
         branch = MagicMock()
         branch.id = branch_id
         branch.cutoff_marks = 70
 
-        db.execute = AsyncMock(
-            return_value=_scalar_result([branch])
-        )
+        db.execute = AsyncMock(return_value=_scalar_result([branch]))
 
-        db.get = AsyncMock(
-            return_value=application
-        )
+        db.get = AsyncMock(return_value=application)
 
         result = await service.run_shortlisting_round(1)
 
@@ -400,9 +396,7 @@ async def test_run_shortlisting_round_creates_offers():
 
     mail_service.send_offer_email.assert_awaited_once()
 
-    sent_application, offer = (
-        mail_service.send_offer_email.await_args.args
-    )
+    sent_application, offer = mail_service.send_offer_email.await_args.args
 
     assert sent_application is application
     assert offer.application_id == application_id
@@ -435,42 +429,37 @@ async def test_run_shortlisting_round_creates_status_history():
         mail_service=mail_service,
     )
 
-    with patch.object(
-        service,
-        "_compute_remaining_seats",
-        new=AsyncMock(
-            return_value={branch_id: 1}
+    with (
+        patch.object(
+            service,
+            "_compute_remaining_seats",
+            new=AsyncMock(return_value={branch_id: 1}),
         ),
-    ), patch.object(
-        service,
-        "_build_candidate_pool",
-        new=AsyncMock(return_value=[]),
-    ), patch(
-        "app.services.shortlisting.shortlisting_service.run_deferred_acceptance",
-        return_value={
-            application_id: branch_id,
-        },
+        patch.object(
+            service,
+            "_build_candidate_pool",
+            new=AsyncMock(return_value=[]),
+        ),
+        patch(
+            "app.services.shortlisting.shortlisting_service.run_deferred_acceptance",
+            return_value={
+                application_id: branch_id,
+            },
+        ),
     ):
         branch = MagicMock()
         branch.id = branch_id
         branch.cutoff_marks = 70
 
-        db.execute = AsyncMock(
-            return_value=_scalar_result([branch])
-        )
+        db.execute = AsyncMock(return_value=_scalar_result([branch]))
 
-        db.get = AsyncMock(
-            return_value=application
-        )
+        db.get = AsyncMock(return_value=application)
 
         await service.run_shortlisting_round(1)
 
     assert application.status == ApplicationStatus.OFFER_MADE
 
-    added_objects = [
-        call.args[0]
-        for call in db.add.call_args_list
-    ]
+    added_objects = [call.args[0] for call in db.add.call_args_list]
 
     histories = [
         obj
@@ -487,6 +476,7 @@ async def test_run_shortlisting_round_creates_status_history():
     assert history.new_status == ApplicationStatus.OFFER_MADE
     assert history.changed_by == "SYSTEM:SHORTLISTING"
 
+
 @pytest.mark.asyncio
 async def test_round_two_expires_round_one_offers_first():
     db = MagicMock()
@@ -500,28 +490,21 @@ async def test_round_two_expires_round_one_offers_first():
     expire = AsyncMock()
     service._expire_stale_offers = expire
 
-    service._compute_remaining_seats = AsyncMock(
-        return_value={}
-    )
+    service._compute_remaining_seats = AsyncMock(return_value={})
 
-    service._build_candidate_pool = AsyncMock(
-        return_value=[]
-    )
+    service._build_candidate_pool = AsyncMock(return_value=[])
 
     with patch(
         "app.services.shortlisting.shortlisting_service.run_deferred_acceptance",
         return_value={},
     ):
-        db.execute = AsyncMock(
-            return_value=_scalar_result([])
-        )
+        db.execute = AsyncMock(return_value=_scalar_result([]))
 
         db.commit = AsyncMock()
 
         await service.run_shortlisting_round(2)
 
     expire.assert_awaited_once_with(1)
-
 
 
 @pytest.mark.asyncio
@@ -537,27 +520,22 @@ async def test_round_three_expires_round_two_offers_first():
     expire = AsyncMock()
     service._expire_stale_offers = expire
 
-    service._compute_remaining_seats = AsyncMock(
-        return_value={}
-    )
+    service._compute_remaining_seats = AsyncMock(return_value={})
 
-    service._build_candidate_pool = AsyncMock(
-        return_value=[]
-    )
+    service._build_candidate_pool = AsyncMock(return_value=[])
 
     with patch(
         "app.services.shortlisting.shortlisting_service.run_deferred_acceptance",
         return_value={},
     ):
-        db.execute = AsyncMock(
-            return_value=_scalar_result([])
-        )
+        db.execute = AsyncMock(return_value=_scalar_result([]))
 
         db.commit = AsyncMock()
 
         await service.run_shortlisting_round(3)
 
     expire.assert_awaited_once_with(2)
+
 
 @pytest.mark.asyncio
 async def test_run_shortlisting_round_with_no_assignments():
@@ -582,9 +560,7 @@ async def test_run_shortlisting_round_with_no_assignments():
         }
     )
 
-    service._build_candidate_pool = AsyncMock(
-        return_value=[]
-    )
+    service._build_candidate_pool = AsyncMock(return_value=[])
 
     with patch(
         "app.services.shortlisting.shortlisting_service.run_deferred_acceptance",
@@ -594,9 +570,7 @@ async def test_run_shortlisting_round_with_no_assignments():
         branch.id = branch_id
         branch.cutoff_marks = 70
 
-        db.execute = AsyncMock(
-            return_value=_scalar_result([branch])
-        )
+        db.execute = AsyncMock(return_value=_scalar_result([branch]))
 
         result = await service.run_shortlisting_round(1)
 

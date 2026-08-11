@@ -2,6 +2,7 @@ import asyncio
 from logging.config import fileConfig
 
 from sqlalchemy import pool
+
 # CRITICAL: We import the asynchronous engine helper from config
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -9,7 +10,8 @@ from alembic import context
 
 # --- REGISTER YOUR APPLICATION MODULES ---
 from app.core.config import settings  # Loads your validated .env URL string
-from app.models import Base           # Loads ALL your registered domain tables
+from app.models import Base  # Loads ALL your registered domain tables
+
 # -----------------------------------------
 
 # this is the Alembic Config object, which provides
@@ -85,6 +87,3 @@ if context.is_offline_mode():
 else:
     # Safely handle the asynchronous event execution block loop mapping
     asyncio.run(run_migrations_online())
-
-
-

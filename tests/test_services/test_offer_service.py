@@ -1,16 +1,24 @@
 # tests/test_track_a/test_offer_service.py
 import uuid
-import pytest
 from datetime import datetime, timedelta, timezone
+
+import pytest
 from fastapi import HTTPException
 
-from app.core.factories import get_offer_service, get_application_service
+from app.core.factories import get_application_service, get_offer_service
 from app.models.domain import Offer
-from app.models.enums import OfferStatus, ApplicationStatus
+from app.models.enums import ApplicationStatus, OfferStatus
 from app.schemas.offer import OfferDecisionRequest
 
 
-async def _create_offer(db_session, application_id, branch_id, status=OfferStatus.PENDING, expires_in_hours=48, round_number=1):
+async def _create_offer(
+    db_session,
+    application_id,
+    branch_id,
+    status=OfferStatus.PENDING,
+    expires_in_hours=48,
+    round_number=1,
+):
     offer = Offer(
         application_id=application_id,
         branch_id=branch_id,
@@ -26,6 +34,7 @@ async def _create_offer(db_session, application_id, branch_id, status=OfferStatu
 
 # ---------------- list_my_offers ----------------
 
+
 @pytest.mark.asyncio
 async def test_list_my_offers_empty_when_no_application(db_session, test_student):
     offer_service = get_offer_service(db_session)
@@ -34,7 +43,9 @@ async def test_list_my_offers_empty_when_no_application(db_session, test_student
 
 
 @pytest.mark.asyncio
-async def test_list_my_offers_returns_offers_for_application(db_session, test_student, test_application, test_branch):
+async def test_list_my_offers_returns_offers_for_application(
+    db_session, test_student, test_application, test_branch
+):
     offer_service = get_offer_service(db_session)
     await _create_offer(db_session, test_application.id, test_branch.id)
 
@@ -45,37 +56,51 @@ async def test_list_my_offers_returns_offers_for_application(db_session, test_st
 
 # ---------------- check_branch_offered_to_student ----------------
 
+
 @pytest.mark.asyncio
-async def test_check_branch_offered_to_student_false_when_no_offer(db_session, test_application, test_branch):
+async def test_check_branch_offered_to_student_false_when_no_offer(
+    db_session, test_application, test_branch
+):
     offer_service = get_offer_service(db_session)
-    result = await offer_service.check_branch_offered_to_student(test_application.id, test_branch.id)
+    result = await offer_service.check_branch_offered_to_student(
+        test_application.id, test_branch.id
+    )
     assert result is False
 
 
 @pytest.mark.asyncio
-async def test_check_branch_offered_to_student_true_when_offer_exists(db_session, test_application, test_branch):
+async def test_check_branch_offered_to_student_true_when_offer_exists(
+    db_session, test_application, test_branch
+):
     offer_service = get_offer_service(db_session)
     await _create_offer(db_session, test_application.id, test_branch.id)
-    result = await offer_service.check_branch_offered_to_student(test_application.id, test_branch.id)
+    result = await offer_service.check_branch_offered_to_student(
+        test_application.id, test_branch.id
+    )
     assert result is True
 
 
 # ---------------- process_student_decision: guards ----------------
 
+
 @pytest.mark.asyncio
 async def test_process_student_decision_raises_404_when_offer_belongs_to_another_student(
     db_session, test_student, test_application, test_branch
 ):
-    from app.core.factories import get_student_service, get_application_service
-    from app.schemas.application import ApplicationCreateRequest, PreferenceEntry
     from datetime import date
+
+    from app.core.factories import get_student_service
+    from app.schemas.application import ApplicationCreateRequest, PreferenceEntry
 
     student_service = get_student_service(db_session)
     application_service = get_application_service(db_session)
 
     other_student = await student_service.create_new_student(
-        name="Other Student", email=f"other_{uuid.uuid4().hex[:8]}@example.com",
-        password="Pass123!", phone=None, date_of_birth=date(2003, 4, 12),
+        name="Other Student",
+        email=f"other_{uuid.uuid4().hex[:8]}@example.com",
+        password="Pass123!",
+        phone=None,
+        date_of_birth=date(2003, 4, 12),
     )
     other_application = await application_service.create_student_application(
         other_student,
@@ -99,16 +124,20 @@ async def test_process_student_decision_raises_404_when_offer_belongs_to_another
 async def test_process_student_decision_raises_404_when_offer_belongs_to_another_student(
     db_session, test_student, test_application, test_branch
 ):
-    from app.core.factories import get_student_service, get_application_service
-    from app.schemas.application import ApplicationCreateRequest, PreferenceEntry
     from datetime import date
+
+    from app.core.factories import get_student_service
+    from app.schemas.application import ApplicationCreateRequest, PreferenceEntry
 
     student_service = get_student_service(db_session)
     application_service = get_application_service(db_session)
 
     other_student = await student_service.create_new_student(
-        name="Other Student", email=f"other_{uuid.uuid4().hex[:8]}@example.com",
-        password="Pass123!", phone=None, date_of_birth=date(2003, 4, 12),
+        name="Other Student",
+        email=f"other_{uuid.uuid4().hex[:8]}@example.com",
+        password="Pass123!",
+        phone=None,
+        date_of_birth=date(2003, 4, 12),
     )
     other_application = await application_service.create_student_application(
         other_student,
@@ -133,7 +162,9 @@ async def test_process_student_decision_raises_409_when_already_resolved(
     db_session, test_student, test_application, test_branch
 ):
     offer_service = get_offer_service(db_session)
-    offer = await _create_offer(db_session, test_application.id, test_branch.id, status=OfferStatus.ACCEPTED)
+    offer = await _create_offer(
+        db_session, test_application.id, test_branch.id, status=OfferStatus.ACCEPTED
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await offer_service.process_student_decision(
@@ -147,7 +178,9 @@ async def test_process_student_decision_raises_410_when_expired(
     db_session, test_student, test_application, test_branch
 ):
     offer_service = get_offer_service(db_session)
-    offer = await _create_offer(db_session, test_application.id, test_branch.id, expires_in_hours=-1)
+    offer = await _create_offer(
+        db_session, test_application.id, test_branch.id, expires_in_hours=-1
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await offer_service.process_student_decision(
@@ -157,6 +190,7 @@ async def test_process_student_decision_raises_410_when_expired(
 
 
 # ---------------- process_student_decision: accept path ----------------
+
 
 @pytest.mark.asyncio
 async def test_process_student_decision_accept_decrements_seat_and_updates_status(
@@ -214,6 +248,7 @@ async def test_process_student_decision_records_history_entry_on_accept(
     db_session, test_student, test_application, test_branch
 ):
     from app.core.factories import get_application_history_service
+
     offer_service = get_offer_service(db_session)
     history_service = get_application_history_service(db_session)
     offer = await _create_offer(db_session, test_application.id, test_branch.id)
@@ -227,6 +262,7 @@ async def test_process_student_decision_records_history_entry_on_accept(
 
 
 # ---------------- process_student_decision: reject path ----------------
+
 
 @pytest.mark.asyncio
 async def test_process_student_decision_reject_sets_offer_rejected_status(
@@ -295,11 +331,18 @@ async def test_process_student_decision_reject_non_first_preference_marks_offer_
 
     branch_service = get_branch_service(db_session)
     second_branch = await branch_service.create_branch(
-        BranchCreateRequest(name="Second Choice", code=f"SC{uuid.uuid4().hex[:4]}", total_seats=30, cutoff_marks=80)
+        BranchCreateRequest(
+            name="Second Choice",
+            code=f"SC{uuid.uuid4().hex[:4]}",
+            total_seats=30,
+            cutoff_marks=80,
+        )
     )
 
     offer_service = get_offer_service(db_session)
-    offer = await _create_offer(db_session, test_application.id, second_branch.id)  # NOT the first preference
+    offer = await _create_offer(
+        db_session, test_application.id, second_branch.id
+    )  # NOT the first preference
 
     await offer_service.process_student_decision(
         test_student, offer.id, OfferDecisionRequest(accept=False)

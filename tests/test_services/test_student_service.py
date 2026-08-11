@@ -1,13 +1,14 @@
 # tests/test_track_a/test_student_service.py
 import uuid
-import pytest
 from datetime import date, timedelta
+
+import pytest
 from fastapi import HTTPException
 
 from app.core.factories import get_student_service
 
-
 # ---------------- create_new_student ----------------
+
 
 @pytest.mark.asyncio
 async def test_create_new_student_succeeds_with_valid_data(db_session):
@@ -83,6 +84,7 @@ async def test_create_new_student_rejects_dob_equal_to_today(db_session):
 
 # ---------------- get_student_by_id ----------------
 
+
 @pytest.mark.asyncio
 async def test_get_student_by_id_returns_real_student(db_session, test_student):
     service = get_student_service(db_session)
@@ -108,6 +110,7 @@ async def test_get_student_by_id_returns_none_for_unknown_id(db_session):
 
 # ---------------- get_student_by_email ----------------
 
+
 @pytest.mark.asyncio
 async def test_get_student_by_email_returns_real_student(db_session, test_student):
     service = get_student_service(db_session)
@@ -126,8 +129,11 @@ async def test_get_student_by_email_returns_none_for_unknown_email(db_session):
 
 # ---------------- get_student_application ----------------
 
+
 @pytest.mark.asyncio
-async def test_get_student_application_returns_application_when_exists(db_session, test_student, test_application):
+async def test_get_student_application_returns_application_when_exists(
+    db_session, test_student, test_application
+):
     """
     test_application fixture creates an application tied to test_student,
     so this should return it via the student.application relationship.
@@ -149,7 +155,9 @@ async def test_get_student_application_raises_404_for_unknown_student_id(db_sess
 
 
 @pytest.mark.asyncio
-async def test_get_student_application_when_student_has_no_application(db_session, test_student):
+async def test_get_student_application_when_student_has_no_application(
+    db_session, test_student
+):
     """
     A registered student who hasn't created an application yet — this is
     the exact case your chat router's 'no application yet' short-circuit

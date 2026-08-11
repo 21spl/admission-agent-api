@@ -1,15 +1,9 @@
-
-
-import uuid
-
 import pytest
-
-from app.models.enums import ApplicationStatus
-from fastapi import HTTPException, status
 
 # ============================================================
 # Helpers
 # ============================================================
+
 
 async def _get_student_token(client, test_student):
     response = await client.post(
@@ -28,6 +22,7 @@ async def _get_student_token(client, test_student):
 # ============================================================
 # POST /applications
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_submit_application_success(
@@ -153,6 +148,7 @@ async def test_submit_application_rejects_student_token_for_invalid_body(
 # GET /applications/me
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_get_my_application_returns_application(
     client,
@@ -200,4 +196,3 @@ async def test_get_my_application_rejects_invalid_token(
     )
 
     assert response.status_code == 401
-

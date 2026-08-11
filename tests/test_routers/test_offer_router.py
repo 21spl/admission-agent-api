@@ -1,7 +1,5 @@
-
-
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -11,10 +9,10 @@ from app.core.factories import get_offer_service
 from app.main import app
 from app.models.enums import OfferStatus
 
-
 # ============================================================
 # Helpers
 # ============================================================
+
 
 async def _get_student_token(client, test_student):
     response = await client.post(
@@ -47,6 +45,7 @@ async def _get_officer_token(client, test_officer):
 # ============================================================
 # GET /offers/me
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_get_my_offers_returns_empty_list_when_student_has_no_offers(
@@ -88,6 +87,7 @@ async def test_get_my_offers_rejects_invalid_token(client):
 # ============================================================
 # PATCH /offers/{offer_id}/respond
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_respond_to_offer_requires_authentication(
@@ -259,6 +259,7 @@ async def test_respond_to_offer_propagates_service_409(
 # GET /offers/application/{application_id}
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_get_offers_by_application_returns_empty_list(
     client,
@@ -321,9 +322,11 @@ async def test_get_offers_by_application_rejects_invalid_application_id(
 
     assert response.status_code == 422
 
+
 # ============================================================
 # Successful GET /offers/me
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_get_my_offers_returns_offers(
@@ -345,9 +348,7 @@ async def test_get_my_offers_returns_offers(
 
     service = AsyncMock()
 
-    service.list_my_offers = AsyncMock(
-        return_value=[offer]
-    )
+    service.list_my_offers = AsyncMock(return_value=[offer])
 
     app.dependency_overrides[get_offer_service] = lambda: service
 
@@ -388,6 +389,7 @@ async def test_get_my_offers_returns_offers(
 # Successful PATCH /offers/{offer_id}/respond
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_accept_offer_success(
     client,
@@ -414,9 +416,7 @@ async def test_accept_offer_success(
 
     service = AsyncMock()
 
-    service.process_student_decision = AsyncMock(
-        return_value=offer
-    )
+    service.process_student_decision = AsyncMock(return_value=offer)
 
     app.dependency_overrides[get_offer_service] = lambda: service
 
@@ -485,9 +485,7 @@ async def test_reject_offer_success(
 
     service = AsyncMock()
 
-    service.process_student_decision = AsyncMock(
-        return_value=offer
-    )
+    service.process_student_decision = AsyncMock(return_value=offer)
 
     app.dependency_overrides[get_offer_service] = lambda: service
 
@@ -531,6 +529,7 @@ async def test_reject_offer_success(
 # Successful GET /offers/application/{application_id}
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_get_offers_by_application_returns_offers(
     client,
@@ -555,9 +554,7 @@ async def test_get_offers_by_application_returns_offers(
 
     service = AsyncMock()
 
-    service.list_offers_for_application = AsyncMock(
-        return_value=[offer]
-    )
+    service.list_offers_for_application = AsyncMock(return_value=[offer])
 
     app.dependency_overrides[get_offer_service] = lambda: service
 
@@ -587,7 +584,4 @@ async def test_get_offers_by_application_returns_offers(
     assert data[0]["status"] == OfferStatus.PENDING.value
     assert data[0]["responded_at"] is None
 
-    service.list_offers_for_application.assert_awaited_once_with(
-        test_application.id
-    )
-
+    service.list_offers_for_application.assert_awaited_once_with(test_application.id)

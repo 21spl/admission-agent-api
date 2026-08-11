@@ -3,15 +3,15 @@ Shared test fixtures. Every test gets a real async DB session wrapped in
 a transaction that is rolled back at the end — so tests run against the
 actual dev Neon database, but never leave data behind.
 """
-import pytest
+
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
 from app.core.security import hash_password
-from app.main import app  # FastAPI app instance
 from app.database import get_db
+from app.main import app  # FastAPI app instance
 from app.models.domain import Officer
 from app.models.enums import OfficerRole  # DB session factory
 
@@ -36,11 +36,9 @@ async def db_session():
         yield session
     finally:
         await session.close()
-        await transaction.rollback()   # <-- this is what keeps your dev DB clean
+        await transaction.rollback()  # <-- this is what keeps your dev DB clean
         await connection.close()
         await engine.dispose()
-
-
 
 
 @pytest_asyncio.fixture
@@ -51,6 +49,7 @@ async def client(db_session):
     requests made through the client and direct service calls in a test
     share one transaction.
     """
+
     async def _override_get_db():
         yield db_session
 
@@ -63,14 +62,15 @@ async def client(db_session):
     app.dependency_overrides.clear()
 
 
-
 # conftest.py — add this alongside db_session and client
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
+
 
 @pytest_asyncio.fixture
 async def test_student(db_session):
     from app.core.factories import get_student_service
+
     student_service = get_student_service(db_session)
     student = await student_service.create_new_student(
         name="Test Student",
@@ -92,9 +92,10 @@ async def test_application(db_session, test_student, test_branch):
         total_marks=85.5,
         preferences=[PreferenceEntry(branch_id=test_branch.id, preference_order=1)],
     )
-    application = await application_service.create_student_application(test_student, data)
+    application = await application_service.create_student_application(
+        test_student, data
+    )
     return application
-
 
 
 @pytest_asyncio.fixture
@@ -133,7 +134,8 @@ async def test_offer(db_session, test_application):
     await db_session.commit()
     return offer
 
-"""   
+"""
+
 
 @pytest_asyncio.fixture
 async def test_officer(db_session):

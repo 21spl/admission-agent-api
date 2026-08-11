@@ -1,18 +1,21 @@
 # tests/test_track_a/test_branch_service.py
 import uuid
+
 import pytest
 from fastapi import HTTPException
 
 from app.core.factories import get_branch_service
 from app.schemas.branch import BranchCreateRequest, BranchUpdateRequest
 
-
 # ---------------- create_branch ----------------
+
 
 @pytest.mark.asyncio
 async def test_create_branch_succeeds_with_valid_data(db_session):
     service = get_branch_service(db_session)
-    data = BranchCreateRequest(name="Mechanical Engineering", code="mech1", total_seats=40, cutoff_marks=70)
+    data = BranchCreateRequest(
+        name="Mechanical Engineering", code="mech1", total_seats=40, cutoff_marks=70
+    )
 
     branch = await service.create_branch(data)
 
@@ -22,7 +25,9 @@ async def test_create_branch_succeeds_with_valid_data(db_session):
 
 
 @pytest.mark.asyncio
-async def test_create_branch_rejects_duplicate_code_case_insensitively(db_session, test_branch):
+async def test_create_branch_rejects_duplicate_code_case_insensitively(
+    db_session, test_branch
+):
     """
     Codes are uppercased before comparison — a duplicate submitted in a
     different case should still be rejected, not slip through.
@@ -43,6 +48,7 @@ async def test_create_branch_rejects_duplicate_code_case_insensitively(db_sessio
 
 # ---------------- get_branch ----------------
 
+
 @pytest.mark.asyncio
 async def test_get_branch_returns_real_branch(db_session, test_branch):
     service = get_branch_service(db_session)
@@ -60,6 +66,7 @@ async def test_get_branch_raises_404_for_unknown_id(db_session):
 
 # ---------------- list_branches ----------------
 
+
 @pytest.mark.asyncio
 async def test_list_branches_includes_created_branch(db_session, test_branch):
     service = get_branch_service(db_session)
@@ -69,8 +76,11 @@ async def test_list_branches_includes_created_branch(db_session, test_branch):
 
 # ---------------- update_branch: capacity math ----------------
 
+
 @pytest.mark.asyncio
-async def test_update_branch_increases_total_seats_preserves_occupied(db_session, test_branch):
+async def test_update_branch_increases_total_seats_preserves_occupied(
+    db_session, test_branch
+):
     """
     test_branch starts at total_seats=60, available_seats=60 (0 occupied).
     Increasing total_seats to 80 with 0 occupied should leave available_seats=80.
@@ -85,7 +95,9 @@ async def test_update_branch_increases_total_seats_preserves_occupied(db_session
 
 
 @pytest.mark.asyncio
-async def test_update_branch_rejects_capacity_below_occupied_seats(db_session, test_branch, db_session_direct_update=None):
+async def test_update_branch_rejects_capacity_below_occupied_seats(
+    db_session, test_branch, db_session_direct_update=None
+):
     """
     Simulate occupied seats by directly reducing available_seats below
     total_seats (as if offers had been made), then confirm attempting to
@@ -112,7 +124,9 @@ async def test_update_branch_rejects_capacity_below_occupied_seats(db_session, t
 
 
 @pytest.mark.asyncio
-async def test_update_branch_allows_capacity_reduction_above_occupied_seats(db_session, test_branch):
+async def test_update_branch_allows_capacity_reduction_above_occupied_seats(
+    db_session, test_branch
+):
     """Same setup as above, but reducing to a value still >= occupied seats should succeed."""
     service = get_branch_service(db_session)
 
@@ -129,8 +143,11 @@ async def test_update_branch_allows_capacity_reduction_above_occupied_seats(db_s
 
 # ---------------- update_branch: partial field updates ----------------
 
+
 @pytest.mark.asyncio
-async def test_update_branch_updates_name_only_leaves_other_fields_unchanged(db_session, test_branch):
+async def test_update_branch_updates_name_only_leaves_other_fields_unchanged(
+    db_session, test_branch
+):
     service = get_branch_service(db_session)
     original_code = test_branch.code
     original_cutoff = test_branch.cutoff_marks
@@ -144,13 +161,17 @@ async def test_update_branch_updates_name_only_leaves_other_fields_unchanged(db_
 
 
 @pytest.mark.asyncio
-async def test_update_branch_code_rejects_collision_with_different_branch(db_session, test_branch):
+async def test_update_branch_code_rejects_collision_with_different_branch(
+    db_session, test_branch
+):
     """
     Create a second branch, then attempt to rename test_branch's code to
     match the second branch's code — should be rejected.
     """
     service = get_branch_service(db_session)
-    other_data = BranchCreateRequest(name="Other Branch", code="OTHR1", total_seats=20, cutoff_marks=50)
+    other_data = BranchCreateRequest(
+        name="Other Branch", code="OTHR1", total_seats=20, cutoff_marks=50
+    )
     other_branch = await service.create_branch(other_data)
 
     data = BranchUpdateRequest(code=other_branch.code)

@@ -6,10 +6,6 @@ calls on every test run. The critical thing to verify here is the
 identity-binding discipline: agents must never expose application_id
 as an LLM-fillable parameter.
 """
-import pytest
-import inspect
-
-from conftest import test_student
 
 
 async def _get_student_token(client):
@@ -25,15 +21,17 @@ async def _get_student_token(client):
 
     return response.json()["access_token"]
 
+
 def test_application_agent_tools_never_expose_application_id_parameter(db_session):
     """
     Regression test for the exact bug caught earlier in this project:
     every tool must have application_id closure-bound, never as a
     parameter the LLM can fill in.
     """
+    import uuid
+
     from app.ai.agents.application_agent import build_application_agent
     from app.ai.config import initialize_ai_environment
-    import uuid
 
     llm = initialize_ai_environment()
     agent = build_application_agent(llm, db_session, uuid.uuid4())
@@ -47,12 +45,13 @@ def test_application_agent_tools_never_expose_application_id_parameter(db_sessio
 
 
 def test_all_four_authenticated_agents_have_no_application_id_leakage(db_session):
-    from app.ai.config import initialize_ai_environment
+    import uuid
+
     from app.ai.agents.application_agent import build_application_agent
     from app.ai.agents.document_agent import build_document_agent
-    from app.ai.agents.offer_agent import build_offer_agent
     from app.ai.agents.loan_agent import build_loan_agent
-    import uuid
+    from app.ai.agents.offer_agent import build_offer_agent
+    from app.ai.config import initialize_ai_environment
 
     llm = initialize_ai_environment()
     application_id = uuid.uuid4()
@@ -74,9 +73,10 @@ def test_counsellor_agent_has_no_db_tools():
     agent must ONLY have QueryEngineTools (policy lookups), never a
     FunctionTool wrapping a DB service call.
     """
+    from llama_index.core.tools import QueryEngineTool
+
     from app.ai.agents.counsellor_agent import build_counsellor_agent
     from app.ai.config import initialize_ai_environment
-    from llama_index.core.tools import QueryEngineTool
 
     llm = initialize_ai_environment()
     agent = build_counsellor_agent(llm)
@@ -86,10 +86,3 @@ def test_counsellor_agent_has_no_db_tools():
             f"counsellor_agent has a non-QueryEngineTool tool: {tool.metadata.name} — "
             f"public interface must never have DB access."
         )
-
-
-
-        
-
-
-        
