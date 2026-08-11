@@ -40,7 +40,7 @@ jobs:
         run: alembic upgrade head
 
       - name: Run tests
-        run: pytest -v
+        run: pytest -v -m "not integration"
 
       - name: Run lint (ruff)
         run: ruff check .

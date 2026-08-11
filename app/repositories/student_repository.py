@@ -5,6 +5,8 @@ from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.models.domain import Student
 
@@ -26,6 +28,15 @@ class StudentRepository:
         # repository is consistent regardless of where it's called from.
         result = await self.session.execute(
             select(Student).where(Student.email.ilike(email))
+        )
+        return result.scalar_one_or_none()
+
+
+    async def get_by_id_with_application(self, student_id: uuid.UUID) -> Student | None:
+        result = await self.session.execute(
+            select(Student)
+            .options(selectinload(Student.application))
+            .where(Student.id == student_id)
         )
         return result.scalar_one_or_none()
 

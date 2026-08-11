@@ -7,3 +7,4 @@ __pycache__/
 *.db
 *.py[cod]
 error.txt
+streamlit_app/.streamlit/secrets.toml

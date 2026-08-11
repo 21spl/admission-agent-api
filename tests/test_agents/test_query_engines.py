@@ -9,7 +9,13 @@ them explicitly or in CI on a schedule rather than every push.
 import pytest
 
 
-@pytest.mark.asyncio
+
+
+pytestmark = [
+    pytest.mark.asyncio(loop_scope="session"),
+    pytest.mark.integration,
+]
+
 async def test_loan_policy_engine_answers_grounded_question():
     from app.ai.rag.query_engines import loan_policy_engine
     response = await loan_policy_engine.aquery("What documents are required for a loan application?")
@@ -17,7 +23,7 @@ async def test_loan_policy_engine_answers_grounded_question():
     assert len(str(response)) > 0
 
 
-@pytest.mark.asyncio
+
 async def test_policy_engine_does_not_hallucinate_on_out_of_scope_question():
     """
     Grounding check: a question with no answer in the policy corpus should

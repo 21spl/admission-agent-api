@@ -48,8 +48,10 @@ class StudentService:
         )
         return await self.student_repository.create(student)
 
+    
     async def get_student_application(self, student_id: uuid.UUID) -> Application:
-        current_student = await self.student_repository.get_by_id(student_id)
+        current_student = await self.student_repository.get_by_id_with_application(student_id)
+
         if not current_student:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
