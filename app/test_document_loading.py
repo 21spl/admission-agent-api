@@ -1,5 +1,6 @@
 # test_s3_reader.py — run standalone, no LLM involved
 from llama_index.readers.s3 import S3Reader
+
 from app.core.config import settings
 
 reader = S3Reader(

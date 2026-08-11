@@ -4,15 +4,16 @@ Public-facing agent — no authentication, no DB access, static policy
 documents only. This is the entire public interface: one agent, no
 handoff graph needed since there's nothing to route to.
 """
+
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.tools import QueryEngineTool
 from llama_index.llms.google_genai import GoogleGenAI
 
 from app.ai.rag.query_engines import (
+    branch_eligibility_engine,
+    document_validation_policy_engine,
     loan_policy_engine,
     offer_policy_engine,
-    document_validation_policy_engine,
-    branch_eligibility_engine,
 )
 
 

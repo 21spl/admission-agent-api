@@ -3,8 +3,8 @@ from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.tools import QueryEngineTool
 from llama_index.llms.google_genai import GoogleGenAI
 
-from app.ai.tools.document_query_tools import build_document_query_tools
 from app.ai.rag.query_engines import document_validation_policy_engine
+from app.ai.tools.document_query_tools import build_document_query_tools
 
 
 def build_document_agent(llm: GoogleGenAI, db, application_id) -> FunctionAgent:

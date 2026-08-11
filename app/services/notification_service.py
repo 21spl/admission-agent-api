@@ -1,7 +1,6 @@
 import uuid
-from typing import List  # noqa: UP035
 
-from app.models.domain import NotificationLog, Student
+from app.models.domain import NotificationLog
 
 # import repository
 from app.repositories.notification_repository import NotificationLogRepository
@@ -25,8 +24,8 @@ class NotificationService:
 
     async def get_application_logs(
         self, application_id: uuid.UUID
-    ) -> List[NotificationLog]:
+    ) -> list[NotificationLog]:
         return await self.repository.get_by_application_id(application_id)
 
-    async def get_logs_by_email(self, email: str) -> List[NotificationLog]:
+    async def get_logs_by_email(self, email: str) -> list[NotificationLog]:
         return await self.repository.get_by_recipient_email(email)

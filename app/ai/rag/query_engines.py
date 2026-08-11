@@ -1,14 +1,14 @@
-#query_engine.py
+# query_engine.py
 
 from llama_index.core import VectorStoreIndex
 from llama_index.core.prompts import PromptTemplate
 
-from app.ai.config import get_vector_store_instance, get_embedding_model
+from app.ai.config import get_embedding_model, get_vector_store_instance
 from app.ai.rag.corpora import (
-    OFFER_POLICY_CORPUS,
     BRANCH_ELIGIBILITY_CORPUS,
     DOCUMENT_VALIDATION_POLICY_CORPUS,
     LOAN_POLICY_CORPUS,
+    OFFER_POLICY_CORPUS,
 )
 
 
@@ -52,14 +52,20 @@ def _load_query_engine(corpus, domain_label: str):
     )
 
 
-#========== Loan Policy Engine ==========================
+# ========== Loan Policy Engine ==========================
 loan_policy_engine = _load_query_engine(LOAN_POLICY_CORPUS, "student loan policy")
 
-#========== Offer Policy Engine ==========================
-offer_policy_engine = _load_query_engine(OFFER_POLICY_CORPUS, "offer and shortlisting policy")
+# ========== Offer Policy Engine ==========================
+offer_policy_engine = _load_query_engine(
+    OFFER_POLICY_CORPUS, "offer and shortlisting policy"
+)
 
-#========== Document Validation Policy Engine ==========================
-document_validation_policy_engine = _load_query_engine(DOCUMENT_VALIDATION_POLICY_CORPUS, "document and application validation policy")
+# ========== Document Validation Policy Engine ==========================
+document_validation_policy_engine = _load_query_engine(
+    DOCUMENT_VALIDATION_POLICY_CORPUS, "document and application validation policy"
+)
 
-#========== Branch Eligibility Engine ==========================
-branch_eligibility_engine = _load_query_engine(BRANCH_ELIGIBILITY_CORPUS, "branch and eligibility")
+# ========== Branch Eligibility Engine ==========================
+branch_eligibility_engine = _load_query_engine(
+    BRANCH_ELIGIBILITY_CORPUS, "branch and eligibility"
+)

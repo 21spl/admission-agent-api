@@ -1,7 +1,6 @@
 # app/ai/validation/cross_match.py
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -18,13 +17,13 @@ class CrossMatchResult:
         return ", ".join(self.issues)
 
 
-def _normalize_name(name: Optional[str]) -> str:
+def _normalize_name(name: str | None) -> str:
     if not name:
         return ""
     return " ".join(name.strip().lower().split())
 
 
-def _names_match(a: Optional[str], b: Optional[str]) -> bool:
+def _names_match(a: str | None, b: str | None) -> bool:
     norm_a, norm_b = _normalize_name(a), _normalize_name(b)
     if not norm_a or not norm_b:
         return True  # nothing to compare, skip
@@ -40,7 +39,7 @@ def _dates_match(a, b) -> bool:
 def cross_match_documents(
     marksheet: dict,
     id_card: dict,
-    registration_name: Optional[str],
+    registration_name: str | None,
     registration_dob,
 ) -> CrossMatchResult:
     """Compares extracted marksheet + ID fields against each other and
@@ -67,4 +66,3 @@ def cross_match_documents(
         result.add("dob mismatch between application and marksheet")
 
     return result
-

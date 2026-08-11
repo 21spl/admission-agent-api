@@ -1,4 +1,5 @@
 import logging
+
 import httpx
 from pydantic import BaseModel, EmailStr
 
@@ -16,7 +17,9 @@ class EmailRequest(BaseModel):
     html_content: str
 
 
-async def send_brevo_email(to_email: str, to_name: str, subject: str, html_content: str) -> bool:
+async def send_brevo_email(
+    to_email: str, to_name: str, subject: str, html_content: str
+) -> bool:
     """
     Sends one transactional email via Brevo. Returns True/False rather than
     raising, so a failed email never breaks the caller's loop (e.g. one bad
@@ -36,11 +39,14 @@ async def send_brevo_email(to_email: str, to_name: str, subject: str, html_conte
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            response = await client.post(BREVO_SEND_EMAIL_URL, json=payload, headers=headers)
+            response = await client.post(
+                BREVO_SEND_EMAIL_URL, json=payload, headers=headers
+            )
             response.raise_for_status()
             logger.info(
                 "Email sent to %s | Brevo message id: %s",
-                to_email, response.json().get("messageId"),
+                to_email,
+                response.json().get("messageId"),
             )
             return True
         except httpx.HTTPStatusError as exc:

@@ -1,9 +1,11 @@
 import uuid
-from typing import List
+
 from sqlalchemy import select
+
+from app.models.domain import NotificationLog
 from app.models.enums import NotificationStatus, NotificationType
 from app.repositories.base_repository import BaseRepository
-from app.models.domain import NotificationLog
+
 
 class NotificationLogRepository(BaseRepository[NotificationLog]):
     def __init__(self, db):
@@ -28,9 +30,10 @@ class NotificationLogRepository(BaseRepository[NotificationLog]):
         await self.db.flush()
         return entry
 
-    
     # ==================== GET NOTIFICATION LOGS BY APPLICATION ID ================================
-    async def get_by_application_id(self, application_id: uuid.UUID) -> List[NotificationLog]:
+    async def get_by_application_id(
+        self, application_id: uuid.UUID
+    ) -> list[NotificationLog]:
         """Retrieves a historical ledger list of all messages sent to an application."""
         stmt = (
             select(NotificationLog)
@@ -41,7 +44,7 @@ class NotificationLogRepository(BaseRepository[NotificationLog]):
         return list(result.scalars().all())
 
     # ==================== GET NOTIFICATION LOGS BY RECIPIENT EMAIL ================================
-    async def get_by_recipient_email(self, email: str) -> List[NotificationLog]:
+    async def get_by_recipient_email(self, email: str) -> list[NotificationLog]:
         """Looks up messaging logs across tracking IDs matching a specific destination email."""
         stmt = (
             select(NotificationLog)
@@ -50,5 +53,3 @@ class NotificationLogRepository(BaseRepository[NotificationLog]):
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-
-

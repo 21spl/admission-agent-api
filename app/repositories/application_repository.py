@@ -1,31 +1,29 @@
 import uuid
-from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+
+from app.models.domain import Application
 from app.models.enums import ApplicationStatus
 from app.repositories.base_repository import BaseRepository
-from app.models.domain import Application
 
-from sqlalchemy.orm import selectinload
 
 class ApplicationRepository(BaseRepository[Application]):
     def __init__(self, db):
         super().__init__(Application, db)
 
-
-
-
-
-    async def get_by_student_id(self, student_id: uuid.UUID) -> Optional[Application]:
+    async def get_by_student_id(self, student_id: uuid.UUID) -> Application | None:
         stmt = (
             select(Application)
             .where(Application.student_id == student_id)
-            .options(selectinload(Application.history), selectinload(Application.preferences))
+            .options(
+                selectinload(Application.history), selectinload(Application.preferences)
+            )
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_with_details(self, application_id: uuid.UUID) -> Optional[Application]:
+    async def get_with_details(self, application_id: uuid.UUID) -> Application | None:
         """Eagerly resolves all nested collections for downstream multi-agent pipeline tasks."""
         stmt = (
             select(Application)
@@ -33,13 +31,13 @@ class ApplicationRepository(BaseRepository[Application]):
             .options(
                 selectinload(Application.preferences),
                 selectinload(Application.documents),
-                selectinload(Application.history)
+                selectinload(Application.history),
             )
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_with_student(self, application_id: uuid.UUID) -> Optional[Application]:
+    async def get_with_student(self, application_id: uuid.UUID) -> Application | None:
         """Eagerly resolves the related Student for document cross-matching."""
         stmt = (
             select(Application)
@@ -49,7 +47,6 @@ class ApplicationRepository(BaseRepository[Application]):
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    
     async def list_by_status(self, status: ApplicationStatus) -> list[Application]:
         """Fetches all applications currently in a given status (e.g. pending admin review),
         with documents eagerly loaded for review-queue rendering."""
@@ -60,4 +57,3 @@ class ApplicationRepository(BaseRepository[Application]):
         )
         result = await self.db.execute(stmt)
         return result.scalars().all()
-

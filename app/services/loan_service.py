@@ -2,8 +2,8 @@ import asyncio
 import io
 import json
 import logging
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from pypdf import PdfReader
@@ -11,15 +11,18 @@ from pypdf import PdfReader
 from app.ai.config import initialize_ai_environment
 from app.core.config import settings
 from app.models.domain import Document, LoanApplication, Student
-from app.models.enums import AllowedFileType, ApplicationStatus, DocumentType, LoanStatus
+from app.models.enums import (
+    AllowedFileType,
+    ApplicationStatus,
+    DocumentType,
+    LoanStatus,
+)
 from app.repositories.application_repository import ApplicationRepository
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.loan_repository import LoanRepository
 from app.storage import StorageUploadError, storage_manager
 
 logger = logging.getLogger(__name__)
-
-
 
 
 class IncomeExtractionError(Exception):
@@ -40,11 +43,18 @@ class LoanService:
 
     # =========================================== REQUEST LOAN (orchestrator) ======================================
     async def request_loan(
-        self, student: Student, filename: str, file_bytes: bytes, content_type: AllowedFileType
+        self,
+        student: Student,
+        filename: str,
+        file_bytes: bytes,
+        content_type: AllowedFileType,
     ) -> LoanApplication:
         application = await self.application_repository.get_by_student_id(student.id)
         if not application:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No application profile active for this account.")
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                "No application profile active for this account.",
+            )
 
         if application.status != ApplicationStatus.OFFER_ACCEPTED:
             raise HTTPException(
@@ -67,7 +77,9 @@ class LoanService:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
 
         # Only now do we upload + create records, since extraction succeeded.
-        document = await self._upload_income_certificate(application.id, filename, file_bytes, content_type)
+        document = await self._upload_income_certificate(
+            application.id, filename, file_bytes, content_type
+        )
 
         loan_status = (
             LoanStatus.APPROVED
@@ -86,14 +98,20 @@ class LoanService:
 
     # ============================================ UPLOAD INCOME CERTIFICATE ==================================
     async def _upload_income_certificate(
-        self, application_id, filename: str, file_bytes: bytes, content_type: AllowedFileType
+        self,
+        application_id,
+        filename: str,
+        file_bytes: bytes,
+        content_type: AllowedFileType,
     ) -> Document:
         storage_key = storage_manager.build_student_doc_key(
             application_id, DocumentType.INCOME_CERTIFICATE.value, filename
         )
 
         try:
-            await storage_manager.upload_document(io.BytesIO(file_bytes), storage_key, content_type.value)
+            await storage_manager.upload_document(
+                io.BytesIO(file_bytes), storage_key, content_type.value
+            )
         except StorageUploadError:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -116,7 +134,9 @@ class LoanService:
         llm = initialize_ai_environment()
         pdf_text = await asyncio.to_thread(self._read_pdf_text, file_bytes)
         if not pdf_text.strip():
-            raise IncomeExtractionError("Could not read any content from the uploaded document.")
+            raise IncomeExtractionError(
+                "Could not read any content from the uploaded document."
+            )
 
         prompt = (
             "You are extracting a single figure from an Indian income certificate. "
@@ -138,12 +158,16 @@ class LoanService:
             raise IncomeExtractionError("Could not parse extraction response.") from e
 
         if income is None:
-            raise IncomeExtractionError("Could not find a stated annual income in the document.")
+            raise IncomeExtractionError(
+                "Could not find a stated annual income in the document."
+            )
 
         try:
             return float(income)
         except (TypeError, ValueError) as e:
-            raise IncomeExtractionError("Extracted income value was not numeric.") from e
+            raise IncomeExtractionError(
+                "Extracted income value was not numeric."
+            ) from e
 
     # ========================================== READ PDF TEXT =================================================
     @staticmethod
@@ -155,14 +179,21 @@ class LoanService:
     async def get_loan_application(self, student: Student) -> LoanApplication:
         application = await self.application_repository.get_by_student_id(student.id)
         if not application:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No application profile active for this account.")
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                "No application profile active for this account.",
+            )
 
-        loan_application = await self.loan_repository.get_by_application_id(application.id)
+        loan_application = await self.loan_repository.get_by_application_id(
+            application.id
+        )
         if not loan_application:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No loan application on record.")
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No loan application on record."
+            )
         return loan_application
 
-    async def get_loan_application_by_application_id(self, application_id: uuid.UUID) -> LoanApplication:
+    async def get_loan_application_by_application_id(
+        self, application_id: uuid.UUID
+    ) -> LoanApplication:
         return await self.loan_repository.get_by_application_id(application_id)
-
-    

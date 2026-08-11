@@ -6,7 +6,6 @@ from app.repositories.application_history_repository import (
     ApplicationStatusHistoryRepository,
 )
 from app.repositories.application_repository import ApplicationRepository
-from app.repositories.base_repository import BaseRepository
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.loan_repository import LoanRepository
@@ -30,60 +29,78 @@ from app.services.student_service import StudentService
 
 
 # ================================== REPOSITORIES ====================================
-def get_application_history_repository(db: AsyncSession = Depends(get_db)) -> ApplicationStatusHistoryRepository:  # noqa: B008
+def get_application_history_repository(
+    db: AsyncSession = Depends(get_db),
+) -> ApplicationStatusHistoryRepository:
     return ApplicationStatusHistoryRepository(db)
 
-def get_application_repository(db: AsyncSession = Depends(get_db)) -> ApplicationRepository:  # noqa: B008
+
+def get_application_repository(
+    db: AsyncSession = Depends(get_db),
+) -> ApplicationRepository:
     return ApplicationRepository(db)
 
 
-def get_branch_repository(db: AsyncSession = Depends(get_db)) -> BranchRepository:  # noqa: B008
+def get_branch_repository(db: AsyncSession = Depends(get_db)) -> BranchRepository:
     return BranchRepository(db)
 
-def get_document_repository(db: AsyncSession = Depends(get_db)) -> DocumentRepository:  # noqa: B008
+
+def get_document_repository(db: AsyncSession = Depends(get_db)) -> DocumentRepository:
     return DocumentRepository(db)
 
-def get_offer_repository(db: AsyncSession = Depends(get_db)) -> OfferRepository:  # noqa: B008
+
+def get_offer_repository(db: AsyncSession = Depends(get_db)) -> OfferRepository:
     return OfferRepository(db)
 
-def get_notification_repository(db: AsyncSession = Depends(get_db)) -> NotificationLogRepository:  # noqa: B008
+
+def get_notification_repository(
+    db: AsyncSession = Depends(get_db),
+) -> NotificationLogRepository:
     return NotificationLogRepository(db)
 
-def get_loan_repository(db: AsyncSession = Depends(get_db)) -> LoanRepository:  # noqa: B008
+
+def get_loan_repository(db: AsyncSession = Depends(get_db)) -> LoanRepository:
     return LoanRepository(db)
 
-def get_shortlisting_preference_repository(db: AsyncSession = Depends(get_db)) -> ShortlistingPreferenceRepository:  # noqa: B008
+
+def get_shortlisting_preference_repository(
+    db: AsyncSession = Depends(get_db),
+) -> ShortlistingPreferenceRepository:
     return ShortlistingPreferenceRepository(db)
 
-def get_student_repository(db: AsyncSession = Depends(get_db)) -> StudentRepository:  # noqa: B008
+
+def get_student_repository(db: AsyncSession = Depends(get_db)) -> StudentRepository:
     return StudentRepository(db)
-
-    
-
 
 
 # =================================== SERVICES =====================================
 
+
 def get_branch_service(db: AsyncSession = Depends(get_db)) -> BranchService:
     return BranchService(BranchRepository(db))
 
-#================================== GET APPLICATION SERVICE ================================
+
+# ================================== GET APPLICATION SERVICE ================================
 def get_application_service(db: AsyncSession = Depends(get_db)) -> ApplicationService:
     return ApplicationService(ApplicationRepository(db))
 
-#================================== GET APPLICATION HISTORY SERVICE ================================
-def get_application_history_service(db: AsyncSession = Depends(get_db)) -> ApplicationHistoryService:
+
+# ================================== GET APPLICATION HISTORY SERVICE ================================
+def get_application_history_service(
+    db: AsyncSession = Depends(get_db),
+) -> ApplicationHistoryService:
     return ApplicationHistoryService(
         repository=ApplicationStatusHistoryRepository(db),
         application_repository=ApplicationRepository(db),
     )
 
-#================================== GET NOTIFICATION SERVICE ================================
+
+# ================================== GET NOTIFICATION SERVICE ================================
 def get_notification_service(db: AsyncSession = Depends(get_db)) -> NotificationService:
     return NotificationService(NotificationLogRepository(db))
 
 
-#================================== GET DOCUMENT SERVICE ================================
+# ================================== GET DOCUMENT SERVICE ================================
 def get_document_service(
     db: AsyncSession = Depends(get_db),
     application_service: ApplicationService = Depends(get_application_service),
@@ -95,7 +112,8 @@ def get_document_service(
     )
 
 
-#================================== GET OFFER SERVICE ================================
+# ================================== GET OFFER SERVICE ================================
+
 
 def get_offer_service(
     db: AsyncSession = Depends(get_db),
@@ -118,26 +136,32 @@ def get_loan_service(db: AsyncSession = Depends(get_db)) -> LoanService:
         document_repository=DocumentRepository(db),
     )
 
+
 # ================================== GET ADMIN REVIEW SERVICE ================================
 def get_admin_review_service(
     db: AsyncSession = Depends(get_db),
-    application_service: ApplicationService = Depends(get_application_service)
+    application_service: ApplicationService = Depends(get_application_service),
 ) -> AdminReviewService:
-    return AdminReviewService(ApplicationRepository(db), application_service, DocumentRepository(db))
+    return AdminReviewService(
+        ApplicationRepository(db), application_service, DocumentRepository(db)
+    )
 
 
 # ================================== GET MAIL SERVICE ================================
-def get_mail_service(db: AsyncSession = Depends(get_db), notification_service: NotificationService = Depends(get_notification_service)) -> MailService:
+def get_mail_service(
+    db: AsyncSession = Depends(get_db),
+    notification_service: NotificationService = Depends(get_notification_service),
+) -> MailService:
     return MailService(db, notification_service)
 
-# ================================== GET SHORTLISTING SERVICE ================================
-def get_shortlisting_service(db: AsyncSession = Depends(get_db), mail_service: MailService = Depends(get_mail_service)) -> ShortlistingService:
-    return ShortlistingService(db, mail_service)
 
+# ================================== GET SHORTLISTING SERVICE ================================
+def get_shortlisting_service(
+    db: AsyncSession = Depends(get_db),
+    mail_service: MailService = Depends(get_mail_service),
+) -> ShortlistingService:
+    return ShortlistingService(db, mail_service)
 
 
 def get_student_service(db: AsyncSession = Depends(get_db)) -> StudentService:
     return StudentService(StudentRepository(db), ApplicationRepository(db))
-
-
-

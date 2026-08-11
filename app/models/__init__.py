@@ -1,20 +1,27 @@
 from app.database import Base
 from app.models.domain import (
-    Student, Officer, Branch, Application, 
-    ShortlistingPreference, Document, Offer, 
-    ApplicationStatusHistory, NotificationLog, LoanApplication
+    Application,
+    ApplicationStatusHistory,
+    Branch,
+    Document,
+    LoanApplication,
+    NotificationLog,
+    Offer,
+    Officer,
+    ShortlistingPreference,
+    Student,
 )
 
 __all__ = [
-    "Base",
-    "Student",
-    "Officer",
-    "Branch",
     "Application",
-    "ShortlistingPreference",
-    "Document",
-    "Offer",
     "ApplicationStatusHistory",
+    "Base",
+    "Branch",
+    "Document",
+    "LoanApplication",
     "NotificationLog",
-    "LoanApplication"
+    "Offer",
+    "Officer",
+    "ShortlistingPreference",
+    "Student",
 ]

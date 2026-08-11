@@ -1,20 +1,23 @@
 import uuid
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+
 from app.ai.config import initialize_ai_environment
 from app.ai.workflows.document_validation_workflow import DocumentValidationWorkflow
-from app.core.factories import get_document_service
+from app.core.dependencies import (
+    get_current_student,
+    validate_uploaded_file_type,
+)
+from app.core.factories import (
+    get_application_repository,
+    get_document_service,
+    get_student_repository,
+)
+from app.models.domain import Student
+from app.models.enums import AllowedFileType, DocumentType
 from app.repositories import application_repository, student_repository
-from app.core.factories import get_application_repository, get_student_repository
+from app.schemas.document import DocumentResponse
 from app.services.document_service import DocumentService
-
-from app.schemas.document import DocumentResponse, DocumentValidationUpdateRequest
-from app.core.dependencies import get_current_student, get_current_officer
-from app.models.domain import Student, Officer
-from app.models.enums import DocumentType
-
-from app.core.dependencies import get_current_student, get_current_officer, validate_uploaded_file_type
-from app.models.enums import AllowedFileType
 
 router = APIRouter(prefix="/documents", tags=["Document Infrastructure"])
 
@@ -22,13 +25,16 @@ llm = initialize_ai_environment()
 
 # ================================= UPLOAD DOCUMENT ===============================
 
-@router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED
+)
 async def upload_file_stream(
     doc_type: DocumentType = Form(...),
     file: UploadFile = File(...),
     validated_content_type: AllowedFileType = Depends(validate_uploaded_file_type),
     service: DocumentService = Depends(get_document_service),
-    current_student: Student = Depends(get_current_student)
+    current_student: Student = Depends(get_current_student),
 ):
     file_bytes = await file.read()
     return await service.upload_document_metadata(
@@ -36,7 +42,7 @@ async def upload_file_stream(
         doc_type=doc_type,
         filename=file.filename,
         file_bytes=file_bytes,
-        content_type=validated_content_type
+        content_type=validated_content_type,
     )
 
 
@@ -59,8 +65,7 @@ async def get_documents_by_application(
 '''
 
 
-#================================ REQUEST FOR DOCUMENT VALIDATION ================================
-
+# ================================ REQUEST FOR DOCUMENT VALIDATION ================================
 
 
 @router.post("/applications/{application_id}/documents/validate")
@@ -68,12 +73,16 @@ async def request_all_document_validation(
     application_id: uuid.UUID,
     service: DocumentService = Depends(get_document_service),
     student: Student = Depends(get_current_student),
-    application_repository: application_repository = Depends(get_application_repository),
-    student_repository: student_repository = Depends(get_student_repository)
+    application_repository: application_repository = Depends(
+        get_application_repository
+    ),
+    student_repository: student_repository = Depends(get_student_repository),
 ):
     if student is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
     if not await service.check_all_document_types_uploaded(application_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,7 +91,7 @@ async def request_all_document_validation(
 
     workflow = DocumentValidationWorkflow(
         document_service=service,
-        application_repository=application_repository,  
+        application_repository=application_repository,
         student_repository=student_repository,
         llm=llm,
         timeout=120,
@@ -93,7 +102,9 @@ async def request_all_document_validation(
     return result
 
 
-@router.get("/me", response_model=List[DocumentResponse], status_code=status.HTTP_200_OK)
+@router.get(
+    "/me", response_model=list[DocumentResponse], status_code=status.HTTP_200_OK
+)
 async def list_my_documents(
     service: DocumentService = Depends(get_document_service),
     current_student: Student = Depends(get_current_student),
@@ -103,6 +114,8 @@ async def list_my_documents(
     current student's application, including validation status.
     """
     if current_student.application_id is None:
-        raise HTTPException(status_code=404, detail="No application found for this student.")
+        raise HTTPException(
+            status_code=404, detail="No application found for this student."
+        )
 
     return await service.list_application_documents(current_student.application_id)

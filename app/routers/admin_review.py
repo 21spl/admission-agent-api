@@ -1,40 +1,57 @@
-
 # app/api/routes/admin_review.py
 
 import asyncio
-from typing import List
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.core.dependencies import get_current_officer
-from app.core.factories import get_admin_review_service, get_application_repository, get_document_service
-
+from app.core.factories import (
+    get_admin_review_service,
+    get_application_repository,
+    get_document_service,
+)
 from app.models.domain import Application, Officer
 from app.models.enums import ApplicationStatus, DocumentType
-from app.models.enums import ApplicationStatus, AI_MANAGED_TYPES
 from app.schemas.application_review import ReviewsPendingResponse
 
 router = APIRouter(prefix="/admin/document-reviews", tags=["Admin Review"])
 
 
-#============================================= LIST PENDING REVIEWS =========================================================
+# ============================================= LIST PENDING REVIEWS =========================================================
 
-@router.get("/", response_model=List[ReviewsPendingResponse])
+
+@router.get("/", response_model=list[ReviewsPendingResponse])
 async def list_pending_reviews(
     application_repository=Depends(get_application_repository),
     officer: Officer = Depends(get_current_officer),
-    document_service = Depends(get_document_service),
+    document_service=Depends(get_document_service),
 ):
-    applications = await application_repository.list_by_status(ApplicationStatus.PENDING_REVIEW)
+    applications = await application_repository.list_by_status(
+        ApplicationStatus.PENDING_REVIEW
+    )
 
     # this is an inner function that builds a response for each application
     async def build_response(app: Application) -> ReviewsPendingResponse:
-        marksheet_doc = next((d for d in app.documents if d.doc_type == DocumentType.CLASS12_MARKSHEET), None)
-        id_card_doc = next((d for d in app.documents if d.doc_type == DocumentType.ID_CARD), None)
+        marksheet_doc = next(
+            (d for d in app.documents if d.doc_type == DocumentType.CLASS12_MARKSHEET),
+            None,
+        )
+        id_card_doc = next(
+            (d for d in app.documents if d.doc_type == DocumentType.ID_CARD), None
+        )
 
-        marksheet_link = await document_service.get_download_link(marksheet_doc.id) if marksheet_doc else None
-        id_card_link = await document_service.get_download_link(id_card_doc.id) if id_card_doc else None
+        marksheet_link = (
+            await document_service.get_download_link(marksheet_doc.id)
+            if marksheet_doc
+            else None
+        )
+        id_card_link = (
+            await document_service.get_download_link(id_card_doc.id)
+            if id_card_doc
+            else None
+        )
 
         return ReviewsPendingResponse(
             application_id=app.id,
@@ -50,12 +67,11 @@ async def list_pending_reviews(
     return await asyncio.gather(*(build_response(app) for app in applications))
 
 
+# ============================================= SUBMIT REVIEW DECISION =========================================================
 
-#============================================= SUBMIT REVIEW DECISION =========================================================
 
 class ReviewDecision(BaseModel):
     approve: bool
-
 
 
 @router.post("/{application_id}/decision")
@@ -73,7 +89,6 @@ async def submit_review_decision(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No pending review found for this application.",
         )
-
 
     if decision.approve:
         # call validate_application_manually function

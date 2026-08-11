@@ -3,7 +3,9 @@ from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.google_genai import GoogleGenAI
 
 
-def build_front_desk_agent(llm: GoogleGenAI, specialist_names: list[str]) -> FunctionAgent:
+def build_front_desk_agent(
+    llm: GoogleGenAI, specialist_names: list[str]
+) -> FunctionAgent:
     return FunctionAgent(
         name="front_desk_agent",
         description="Greets the student and routes their question to the right specialist.",

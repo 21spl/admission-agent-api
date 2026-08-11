@@ -11,17 +11,16 @@ counselling).
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
 class Candidate:
     application_id: int
     student_id: int
-    preferences: List[int]        # ordered branch_ids, most preferred first
-    rank_key: Tuple                # sort key, ascending = better (see build below)
+    preferences: list[int]  # ordered branch_ids, most preferred first
+    rank_key: tuple  # sort key, ascending = better (see build below)
     next_pref_index: int = 0
-    held_branch_id: Optional[int] = None
+    held_branch_id: int | None = None
 
 
 @dataclass
@@ -31,25 +30,25 @@ class BranchInfo:
     cutoff_marks: float
 
 
-def build_rank_key(total, maths, phy, chem, english) -> Tuple:
+def build_rank_key(total, maths, phy, chem, english) -> tuple:
     """Descending priority on marks == ascending on the negated tuple."""
     return (-total, -maths, -phy, -chem, -english)
 
 
 def run_deferred_acceptance(
-    candidates: List[Candidate], branches: Dict[int, BranchInfo]
-) -> Dict[int, int]:
+    candidates: list[Candidate], branches: dict[int, BranchInfo]
+) -> dict[int, int]:
     """
     Returns {application_id: branch_id} for candidates who end up holding a seat.
     Candidates who never meet cutoff anywhere, or run out of preferences before
     getting held, are simply absent from the result (no offer for them this round).
     """
-    held: Dict[int, List[Candidate]] = {bid: [] for bid in branches}
+    held: dict[int, list[Candidate]] = {bid: [] for bid in branches}
     free = list(candidates)
 
     while free:
-        proposals: Dict[int, List[Candidate]] = {bid: [] for bid in branches}
-        still_free: List[Candidate] = []
+        proposals: dict[int, list[Candidate]] = {bid: [] for bid in branches}
+        still_free: list[Candidate] = []
 
         for c in free:
             while c.next_pref_index < len(c.preferences):

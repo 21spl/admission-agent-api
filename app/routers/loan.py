@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-from app.core.factories import get_loan_service
 from app.core.dependencies import get_current_student
+from app.core.factories import get_loan_service
 from app.models.domain import Student
 from app.models.enums import AllowedFileType
 from app.schemas.loan import LoanApplicationResponse
@@ -13,7 +13,11 @@ router = APIRouter(prefix="/loan", tags=["loan"])
 ALLOWED_CONTENT_TYPES = {t.value for t in AllowedFileType}
 
 
-@router.post("/apply", response_model=LoanApplicationResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/apply",
+    response_model=LoanApplicationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def apply_for_loan(
     file: UploadFile = File(...),
     student: Student = Depends(get_current_student),
@@ -44,12 +48,12 @@ async def get_loan_application(
     loan_application = await loan_service.get_loan_application(student)
     # convert to response model
     response = LoanApplicationResponse(
-        id = loan_application.id,
-        application_id = loan_application.application_id,
-        income_certificate_doc_id = loan_application.income_certificate_doc_id,
-        status = loan_application.status,
-        extracted_annual_income = loan_application.extracted_annual_income,
-        decided_at = loan_application.decided_at,
+        id=loan_application.id,
+        application_id=loan_application.application_id,
+        income_certificate_doc_id=loan_application.income_certificate_doc_id,
+        status=loan_application.status,
+        extracted_annual_income=loan_application.extracted_annual_income,
+        decided_at=loan_application.decided_at,
     )
 
     return response

@@ -1,9 +1,5 @@
-
-
-from datetime import date
-from typing import Optional
 import uuid
-
+from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
 
@@ -14,29 +10,34 @@ from app.repositories.student_repository import StudentRepository
 
 
 class StudentService:
-
     def __init__(
         self,
         student_repository: StudentRepository,
-        application_repository: ApplicationRepository
-        ):
-        
+        application_repository: ApplicationRepository,
+    ):
+
         self.student_repository = student_repository
         self.application_repository = application_repository
 
-
-    async def create_new_student(self, name: str, email: str, password: str, phone: Optional[str], date_of_birth: date) -> Student:
+    async def create_new_student(
+        self,
+        name: str,
+        email: str,
+        password: str,
+        phone: str | None,
+        date_of_birth: date,
+    ) -> Student:
         existing = await self.student_repository.get_by_email(email)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A student account with email '{email}' already exists."
+                detail=f"A student account with email '{email}' already exists.",
             )
 
-        if date_of_birth >= date.today():
+        if date_of_birth >= datetime.now(tz=timezone.utc).date():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Date of birth must be in the past."
+                detail="Date of birth must be in the past.",
             )
 
         student = Student(
@@ -44,18 +45,19 @@ class StudentService:
             email=email,
             hashed_password=hash_password(password),
             phone=phone,
-            date_of_birth=date_of_birth
+            date_of_birth=date_of_birth,
         )
         return await self.student_repository.create(student)
 
-    
     async def get_student_application(self, student_id: uuid.UUID) -> Application:
-        current_student = await self.student_repository.get_by_id_with_application(student_id)
+        current_student = await self.student_repository.get_by_id_with_application(
+            student_id
+        )
 
         if not current_student:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Student with ID {student_id} not found."
+                detail=f"Student with ID {student_id} not found.",
             )
         return current_student.application
 

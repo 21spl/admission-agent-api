@@ -13,7 +13,6 @@ class StorageUploadError(Exception):
     """Raised when a file fails to upload to the object storage backend."""
 
 
-
 class StorageFetchError(Exception):
     """Raised when a file fails to be retrieved from the object storage backend."""
 
@@ -47,9 +46,13 @@ class FilebaseStorageManager:
                 ExtraArgs={"ContentType": content_type},
             )
         except ClientError as e:
-            raise StorageUploadError(f"Filebase upload failed for key '{key}': {e}") from e
+            raise StorageUploadError(
+                f"Filebase upload failed for key '{key}': {e}"
+            ) from e
 
-    async def upload_document(self, file_object: BinaryIO, key: str, content_type: str) -> str:
+    async def upload_document(
+        self, file_object: BinaryIO, key: str, content_type: str
+    ) -> str:
         """Uploads a file and returns the storage key. Raises StorageUploadError on failure."""
         await asyncio.to_thread(self._upload_sync, file_object, key, content_type)
         return key
@@ -91,14 +94,18 @@ class FilebaseStorageManager:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
             return response["Body"].read()
         except ClientError as e:
-            raise StorageFetchError(f"Filebase fetch failed for key '{key}': {e}") from e
+            raise StorageFetchError(
+                f"Filebase fetch failed for key '{key}': {e}"
+            ) from e
 
     async def fetch_document(self, key: str) -> bytes:
         """Fetches raw file bytes for a given storage key. Raises StorageFetchError on failure."""
         return await asyncio.to_thread(self._fetch_sync, key)
 
     @staticmethod
-    def build_student_doc_key(application_id: uuid.UUID, doc_type: str, filename: str) -> str:
+    def build_student_doc_key(
+        application_id: uuid.UUID, doc_type: str, filename: str
+    ) -> str:
         """
         Builds a storage key for a student application document.
 
@@ -110,7 +117,9 @@ class FilebaseStorageManager:
         return f"student-docs/{application_id}/{doc_type}/{uuid.uuid4()}_{filename}"
 
     @staticmethod
-    def build_admin_doc_key(application_id: uuid.UUID, doc_label: str, filename: str) -> str:
+    def build_admin_doc_key(
+        application_id: uuid.UUID, doc_label: str, filename: str
+    ) -> str:
         """
         Builds a storage key for an admin application document.
 

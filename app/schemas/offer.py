@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import OfferStatus
@@ -15,7 +15,7 @@ class OfferResponse(BaseModel):
     round_number: int
     status: OfferStatus
     sent_at: datetime
-    responded_at: Optional[datetime]
+    responded_at: datetime | None
     expires_at: datetime
 
 

@@ -2,25 +2,22 @@
 
 import json
 import uuid
-from typing import Optional
 
+from llama_index.core.workflow import Context
+from llama_index.readers.s3 import S3Reader
 from pydantic import ValidationError
 from workflows import Workflow, step
 from workflows.events import Event, StartEvent, StopEvent
-from llama_index.core.workflow import Context, InputRequiredEvent, HumanResponseEvent
-from llama_index.readers.s3 import S3Reader
 
+from app.ai.schemas.doc_validation_schemas import GovernmentIDCard, Marksheet
 from app.ai.validation.cross_match import cross_match_documents
 from app.core.config import settings
-from app.ai.schemas.doc_validation_schemas import Marksheet
-from app.ai.schemas.doc_validation_schemas import GovernmentIDCard
-
 from app.models.enums import DocumentType
-
 
 # --------------------------------------------------------------------------
 # Events
 # --------------------------------------------------------------------------
+
 
 class DocumentsLoadedEvent(Event):
     application_id: uuid.UUID
@@ -54,6 +51,7 @@ class ValidationScoredEvent(Event):
 # Workflow
 # --------------------------------------------------------------------------
 
+
 class DocumentValidationWorkflow(Workflow):
     """
     Loads a student's uploaded documents, extracts structured fields from
@@ -85,7 +83,6 @@ class DocumentValidationWorkflow(Workflow):
             DocumentType.CLASS12_MARKSHEET.value: Marksheet,
             DocumentType.ID_CARD.value: GovernmentIDCard,
         }
-
 
     # ----------------------------------------------------------------
     # Step 1: Load all documents for the application from S3
@@ -128,7 +125,7 @@ class DocumentValidationWorkflow(Workflow):
     @step
     async def dispatch_extractions(
         self, ctx: Context, ev: DocumentsLoadedEvent
-    ) -> Optional[DocExtractionRequestEvent]:
+    ) -> DocExtractionRequestEvent | None:
         await ctx.store.set("application_id", ev.application_id)
         await ctx.store.set("expected_count", len(ev.documents))
 
@@ -165,7 +162,7 @@ class DocumentValidationWorkflow(Workflow):
     @step
     async def collect_extractions(
         self, ctx: Context, ev: DocExtractedEvent
-    ) -> Optional[AllExtractedEvent]:
+    ) -> AllExtractedEvent | None:
         expected_count = await ctx.store.get("expected_count")
         application_id = await ctx.store.get("application_id")
 
@@ -184,10 +181,12 @@ class DocumentValidationWorkflow(Workflow):
         marksheet = by_type.get(DocumentType.CLASS12_MARKSHEET.value, {})
         id_card = by_type.get(DocumentType.ID_CARD.value, {})
 
-        application = await self.application_repository.get_with_student(ev.application_id)
+        application = await self.application_repository.get_with_student(
+            ev.application_id
+        )
         student = application.student
 
-        #for debugging
+        # for debugging
         print("MARKSHEET:", marksheet)
         print("ID CARD:", id_card)
         print("REG NAME:", student.name if student else None)
@@ -211,12 +210,18 @@ class DocumentValidationWorkflow(Workflow):
         )
 
     # this is not a step, just to persist marksheet data
-    async def _persist_marksheet(self, student, extracted_docs: list[DocExtractedEvent]) -> None:
+    async def _persist_marksheet(
+        self, student, extracted_docs: list[DocExtractedEvent]
+    ) -> None:
         if student is None:
             return
 
         raw = next(
-            (d.extracted for d in extracted_docs if d.doc_type == DocumentType.CLASS12_MARKSHEET.value),
+            (
+                d.extracted
+                for d in extracted_docs
+                if d.doc_type == DocumentType.CLASS12_MARKSHEET.value
+            ),
             None,
         )
         if not raw:
@@ -244,7 +249,6 @@ class DocumentValidationWorkflow(Workflow):
     # Step 6: Route based on flag count — auto-approve, admin review, or reject
     # ----------------------------------------------------------------
 
-
     @step
     async def route_decision(
         self, ctx: Context, ev: ValidationScoredEvent
@@ -252,7 +256,9 @@ class DocumentValidationWorkflow(Workflow):
         processed_doc_types = [d.doc_type for d in ev.extracted_docs]
 
         if ev.flags == 0:
-            await self.document_service.mark_auto_validated(ev.application_id, processed_doc_types)
+            await self.document_service.mark_auto_validated(
+                ev.application_id, processed_doc_types
+            )
             return StopEvent(result={"status": "validated", "flags": 0, "issues": ""})
 
         if ev.flags >= self.threshold:
@@ -264,9 +270,11 @@ class DocumentValidationWorkflow(Workflow):
             )
 
         await self.document_service.mark_auto_pending(
-            ev.application_id, flags=ev.flags, issues=ev.issues, doc_types=processed_doc_types
+            ev.application_id,
+            flags=ev.flags,
+            issues=ev.issues,
+            doc_types=processed_doc_types,
         )
         return StopEvent(
             result={"status": "pending_review", "flags": ev.flags, "issues": ev.issues}
         )
-

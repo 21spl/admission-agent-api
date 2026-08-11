@@ -1,15 +1,17 @@
 import uuid
-from typing import Optional
+
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.repositories.base_repository import BaseRepository
+
 from app.models.domain import Branch
+from app.repositories.base_repository import BaseRepository
+
 
 class BranchRepository(BaseRepository[Branch]):
     def __init__(self, db: AsyncSession):
         super().__init__(Branch, db)
 
-    async def get_by_code(self, code: str) -> Optional[Branch]:
+    async def get_by_code(self, code: str) -> Branch | None:
         """Fetches a branch by code string for uniqueness validation loops."""
         result = await self.db.execute(select(Branch).where(Branch.code == code))
         return result.scalar_one_or_none()
@@ -38,6 +40,3 @@ class BranchRepository(BaseRepository[Branch]):
         )
         await self.db.execute(stmt)
         await self.db.commit()
-
-
-

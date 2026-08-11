@@ -4,23 +4,30 @@ Two entry points:
   - /support/public/chat/stream   — no auth, counsellor_agent only, no orchestrator
   - /support/chat/stream          — JWT-authenticated, full 4-agent + front desk workflow
 """
-import json
 
-from fastapi import APIRouter, Depends, HTTPException
+import json
+import logging
+
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
-from llama_index.core.agent.workflow import AgentInput, AgentStream, ToolCall, ToolCallResult
+from llama_index.core.agent.workflow import (
+    AgentInput,
+    AgentStream,
+    ToolCall,
+    ToolCallResult,
+)
+from llama_index.core.llms import ChatMessage as LlamaChatMessage
+from llama_index.core.llms import MessageRole
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.core.dependencies import get_current_student
-from app.ai.config import initialize_ai_environment
 from app.ai.agents.counsellor_agent import build_counsellor_agent
 from app.ai.agents.orchestrator import build_authenticated_support_workflow
-from app.ai.schemas.chat_support_schemas import StudentSupportChatRequest  
+from app.ai.config import initialize_ai_environment
+from app.ai.schemas.chat_support_schemas import StudentSupportChatRequest
+from app.core.dependencies import get_current_student
+from app.database import get_db
 
-
-
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/support", tags=["support"])
 
@@ -52,6 +59,7 @@ def _to_chat_history(history) -> list[LlamaChatMessage]:
 
 # ============================= PUBLIC (no auth, no orchestrator) =============================
 
+
 @router.post("/public/chat/stream")
 async def public_chat_stream(payload: StudentSupportChatRequest) -> StreamingResponse:
     llm = initialize_ai_environment()
@@ -78,16 +86,23 @@ async def _agent_event_generator(agent, user_msg: str, chat_history: list):
             elif isinstance(event, ToolCall):
                 yield _sse("tool_call", {"agent": agent.name, "tool": event.tool_name})
             elif isinstance(event, ToolCallResult):
-                yield _sse("tool_result", {"agent": agent.name, "tool": event.tool_name})
+                yield _sse(
+                    "tool_result", {"agent": agent.name, "tool": event.tool_name}
+                )
 
         await handler
         yield _sse("done", {"handled_by": agent.name})
 
     except Exception:
-        yield _sse("error", {"message": "Support assistant is temporarily unavailable."})
+        logger.exception("Student support agent failed")
+        yield _sse(
+            "error",
+            {"message": "Support assistant is temporarily unavailable."},
+        )
 
 
 # ============================= AUTHENTICATED (JWT, full orchestrator) =============================
+
 
 @router.post("/chat/stream")
 async def authenticated_chat_stream(
@@ -117,7 +132,10 @@ async def _workflow_event_generator(workflow, user_msg: str, chat_history: list)
 
     try:
         async for event in handler.stream_events():
-            if isinstance(event, AgentInput) and event.current_agent_name != current_agent:
+            if (
+                isinstance(event, AgentInput)
+                and event.current_agent_name != current_agent
+            ):
                 current_agent = event.current_agent_name
                 yield _sse("agent_switch", {"agent": current_agent})
 
@@ -126,16 +144,21 @@ async def _workflow_event_generator(workflow, user_msg: str, chat_history: list)
                     yield _sse("token", {"content": event.delta})
 
             elif isinstance(event, ToolCall):
-                yield _sse("tool_call", {"agent": current_agent, "tool": event.tool_name})
+                yield _sse(
+                    "tool_call", {"agent": current_agent, "tool": event.tool_name}
+                )
 
             elif isinstance(event, ToolCallResult):
-                yield _sse("tool_result", {"agent": current_agent, "tool": event.tool_name})
+                yield _sse(
+                    "tool_result", {"agent": current_agent, "tool": event.tool_name}
+                )
 
         await handler
         yield _sse("done", {"handled_by": current_agent})
 
     except Exception:
-        yield _sse("error", {"message": "Support assistant is temporarily unavailable."})
-
-
-        
+        logger.exception("Student support agent failed")
+        yield _sse(
+            "error",
+            {"message": "Support assistant is temporarily unavailable."},
+        )

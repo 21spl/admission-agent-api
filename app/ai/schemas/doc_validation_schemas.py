@@ -1,18 +1,16 @@
 # app/ai/schemas/doc_validation_schemas.py
 
-from datetime import date
-from typing import Optional
+from datetime import date, datetime, timezone
 
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     field_validator,
     model_validator,
 )
 
-
 # -------------------- MARKSHEET -------------------- #
+
 
 class SubjectMarks(BaseModel):
     physics: float
@@ -35,12 +33,12 @@ class Marksheet(BaseModel):
     subject_wise_marks: SubjectMarks
 
     max_marks: float
-    grade: Optional[str] = None
+    grade: str | None = None
 
     # Computed fields
-    subject_count: Optional[int] = None
-    total_marks: Optional[float] = None
-    percentage: Optional[float] = None
+    subject_count: int | None = None
+    total_marks: float | None = None
+    percentage: float | None = None
 
     @model_validator(mode="after")
     def calculate_metrics(self) -> "Marksheet":
@@ -60,9 +58,7 @@ class Marksheet(BaseModel):
                 raise ValueError(f"{subject} marks cannot be negative")
 
             if marks > self.max_marks:
-                raise ValueError(
-                    f"{subject} marks cannot exceed max_marks"
-                )
+                raise ValueError(f"{subject} marks cannot exceed max_marks")
 
         self.subject_count = 5
 
@@ -84,6 +80,7 @@ class Marksheet(BaseModel):
 
 # ---------------- GOVERNMENT ID ---------------- #
 
+
 class GovernmentIDCard(BaseModel):
     id_type: str = Field(
         ...,
@@ -100,7 +97,7 @@ class GovernmentIDCard(BaseModel):
         description="Full name printed on the card",
     )
 
-    father_name: Optional[str] = Field(
+    father_name: str | None = Field(
         None,
         description="Father's or Guardian's name",
     )
@@ -135,7 +132,7 @@ class GovernmentIDCard(BaseModel):
 
     @model_validator(mode="after")
     def validate_dates(self) -> "GovernmentIDCard":
-        if self.dob >= date.today():
+        if self.dob >= datetime.now(tz=timezone.utc).date():
             raise ValueError("Date of birth must be in the past")
 
         return self

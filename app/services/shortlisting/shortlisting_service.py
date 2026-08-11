@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.domain import (
     Application,
+    ApplicationStatusHistory,
     Branch,
     Offer,
     ShortlistingPreference,
@@ -19,15 +20,15 @@ from app.services.shortlisting.shortlisting_algorithm import (
     build_rank_key,
     run_deferred_acceptance,
 )
-from app.models.domain import Application, ApplicationStatusHistory, Offer
 
 logger = logging.getLogger(__name__)
 
 
 class ShortlistingService:
-
     MAX_ROUNDS = 3
-    OFFER_RESPONSE_WINDOW_HOURS = 72  # keep in sync with OFFER_TOKEN_TTL_HOURS in offer_tokens.py
+    OFFER_RESPONSE_WINDOW_HOURS = (
+        72  # keep in sync with OFFER_TOKEN_TTL_HOURS in offer_tokens.py
+    )
 
     # applications eligible to be considered in a shortlisting pass:
     # VALIDATED -> first-time entrants (round 1); OFFER_REJECTED / OFFER_EXPIRED
@@ -40,10 +41,9 @@ class ShortlistingService:
     # here we don't consider ApplicationStatus.OFFER_PENDING, cause shortlisting is done only after the round window ends
     # all pending offers are automatically rejected
 
-    def __init__(self, db: AsyncSession, mail_service: MailService): 
+    def __init__(self, db: AsyncSession, mail_service: MailService):
         self.db = db
         self.mail_service = mail_service
-
 
     # ======================================== RUN SHORTLISTING ROUND ========================================
     async def run_shortlisting_round(self, round_number: int) -> dict:
@@ -82,7 +82,6 @@ class ShortlistingService:
                     changed_by="SYSTEM:SHORTLISTING",
                 )
             )
-            
 
             offer = Offer(
                 application_id=app_row.id,
@@ -97,15 +96,12 @@ class ShortlistingService:
 
             await self.mail_service.send_offer_email(app_row, offer)
 
-
-
         await self.db.commit()
         return {
             "round": round_number,
             "offers_made": len(assignments),
             "seats_considered": seats_remaining,
         }
-
 
     # ======================================== EXPIRE STALE OFFERS ========================================
 
@@ -136,11 +132,10 @@ class ShortlistingService:
                 .limit(1)
             )
 
-            
             if first_pref_branch_id == offer.branch_id:
                 # timeout on a first-preference offer -> same outcome as an
                 # explicit first-preference reject: application withdrawn
-                
+
                 app_row.status = ApplicationStatus.WITHDRAWN
                 self.db.add(
                     ApplicationStatusHistory(
@@ -165,9 +160,10 @@ class ShortlistingService:
 
         logger.info(
             "Round %d sweep: %d offers expired (carried forward), %d applications deleted (first-pref timeout)",
-            prior_round, expired_count, deleted_count,
+            prior_round,
+            expired_count,
+            deleted_count,
         )
-
 
     # ======================================== COMPUTE REMAINING SEATS ========================================
 
@@ -186,14 +182,15 @@ class ShortlistingService:
             b.id: max(b.total_seats - accepted_counts.get(b.id, 0), 0) for b in branches
         }
 
-
     # ======================================== BUILD CANDIDATE POOL ========================================
 
     async def _build_candidate_pool(self) -> list[Candidate]:
         applications = (
             (
                 await self.db.execute(
-                    select(Application).where(Application.status.in_(self.ELIGIBLE_STATUSES))
+                    select(Application).where(
+                        Application.status.in_(self.ELIGIBLE_STATUSES)
+                    )
                 )
             )
             .scalars()
@@ -234,8 +231,3 @@ class ShortlistingService:
                 )
             )
         return candidates
-
-
-
-
-    

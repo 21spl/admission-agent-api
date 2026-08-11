@@ -1,24 +1,24 @@
 # app/ai/config.py
 from urllib.parse import urlparse
-from llama_index.llms.google_genai import GoogleGenAI
+
 from llama_index.core import Settings
-from llama_index.vector_stores.postgres import PGVectorStore
+
 # embedding model
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
+from llama_index.llms.google_genai import GoogleGenAI
+from llama_index.vector_stores.postgres import PGVectorStore
 
 # Import your single source of truth configurations directly
 from app.core.config import settings
 
+
 def initialize_ai_environment() -> GoogleGenAI:
     """
-    Initializes the central Google GenAI model instance using validated 
+    Initializes the central Google GenAI model instance using validated
     Pydantic settings and registers it globally within LlamaIndex.
     """
     # Instantiate the LlamaIndex LLM client directly from your Pydantic settings
-    llm = GoogleGenAI(
-        model=settings.GEMINI_MODEL,
-        api_key=settings.GOOGLE_API_KEY
-    )
+    llm = GoogleGenAI(model=settings.GEMINI_MODEL, api_key=settings.GOOGLE_API_KEY)
     # Instantiate the embed_model
     embed_model = GoogleGenAIEmbedding(
         model_name="gemini-embedding-001",
@@ -28,11 +28,8 @@ def initialize_ai_environment() -> GoogleGenAI:
     # Assign globally so all sub-agents inherit this framework engine by default
     Settings.llm = llm
     Settings.embed_model = embed_model
-    
+
     return llm
-
-
-
 
 
 def get_embedding_model() -> GoogleGenAIEmbedding:
@@ -41,14 +38,15 @@ def get_embedding_model() -> GoogleGenAIEmbedding:
         api_key=settings.GOOGLE_API_KEY,
     )
 
+
 def get_vector_store_instance(table_name: str) -> PGVectorStore:
     """
-    Establishes an asynchronous vector database storage engine connection interface 
+    Establishes an asynchronous vector database storage engine connection interface
     by parsing your validated Pydantic DATABASE_URL string.
     """
     # Clean out the internal python +asyncpg connector prefix for raw driver compatibility
     clean_postgres_url = settings.DATABASE_URL.replace("+asyncpg", "")
-    
+
     # Parse out connection details cleanly
 
     parsed = urlparse(clean_postgres_url)
@@ -66,5 +64,5 @@ def get_vector_store_instance(table_name: str) -> PGVectorStore:
         user=username,
         password=password,
         table_name=table_name,
-        embed_dim=3072  
+        embed_dim=3072,
     )

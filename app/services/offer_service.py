@@ -1,20 +1,19 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List
 
 from fastapi import HTTPException, status
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.domain import Offer, Student, Branch
-from app.models.enums import OfferStatus, ApplicationStatus
-from app.repositories.shortlisting_preference_repository import ShortlistingPreferenceRepository
-from app.schemas.offer import OfferDecisionRequest, OfferResponse
-
-from app.repositories.offer_repository import OfferRepository
+from app.models.domain import ApplicationStatusHistory, Branch, Offer, Student
+from app.models.enums import ApplicationStatus, OfferStatus
 from app.repositories.application_repository import ApplicationRepository
+from app.repositories.offer_repository import OfferRepository
+from app.repositories.shortlisting_preference_repository import (
+    ShortlistingPreferenceRepository,
+)
+from app.schemas.offer import OfferDecisionRequest, OfferResponse
 from app.services.application_service import ApplicationService
-from app.models.domain import ApplicationStatusHistory
 
 
 class OfferService:
@@ -32,16 +31,17 @@ class OfferService:
         self.preference_repository = preference_repository
         self.application_service = application_service
 
-    async def list_my_offers(self, student: Student) -> List[Offer]:
+    async def list_my_offers(self, student: Student) -> list[Offer]:
         application = await self.application_repository.get_by_student_id(student.id)
         if application is None:
             return []
         return await self.offer_repository.get_by_application_id(application.id)
 
-    async def list_offers_for_application(self, application_id: uuid.UUID) -> List[Offer]:
+    async def list_offers_for_application(
+        self, application_id: uuid.UUID
+    ) -> list[Offer]:
         return await self.offer_repository.get_by_application_id(application_id)
 
-    
     async def process_student_decision(
         self, student: Student, offer_id: uuid.UUID, data: OfferDecisionRequest
     ) -> OfferResponse:
@@ -49,12 +49,17 @@ class OfferService:
         if offer is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Offer not found.")
 
-        application = await self.application_repository.get_with_details(offer.application_id)
+        application = await self.application_repository.get_with_details(
+            offer.application_id
+        )
         if application is None or application.student_id != student.id:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Offer not found.")
 
         if offer.status != OfferStatus.PENDING:
-            raise HTTPException(status.HTTP_409_CONFLICT, f"Offer already resolved (status={offer.status}).")
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Offer already resolved (status={offer.status}).",
+            )
 
         now = datetime.now(timezone.utc)
         if offer.expires_at < now:
@@ -72,7 +77,9 @@ class OfferService:
             )
             result = await self.db.execute(stmt)
             if result.rowcount == 0:
-                raise HTTPException(status.HTTP_409_CONFLICT, "No seats remaining for this branch.")
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT, "No seats remaining for this branch."
+                )
 
             offer.status = OfferStatus.ACCEPTED
             offer.responded_at = now
@@ -92,7 +99,9 @@ class OfferService:
             return OfferResponse.model_validate(offer)
 
         # --- reject path ---
-        first_pref = await self.preference_repository.get_first_preference(application.id)
+        first_pref = await self.preference_repository.get_first_preference(
+            application.id
+        )
         first_pref_branch_id = first_pref.branch_id if first_pref else None
 
         offer.status = OfferStatus.REJECTED
@@ -117,9 +126,10 @@ class OfferService:
         await self.db.refresh(offer)
         return OfferResponse.model_validate(offer)
 
-
     # ======================== CHECK IF THE BRANCH WAS ACTUALLY OFFERED TO STUDENT OR NOT ============================
-    async def check_branch_offered_to_student(self, application_id: uuid.UUID, branch_id: uuid.UUID) -> bool:
+    async def check_branch_offered_to_student(
+        self, application_id: uuid.UUID, branch_id: uuid.UUID
+    ) -> bool:
         offer_list = await self.offer_repository.get_by_application_id(application_id)
         for offer in offer_list:
             if offer.branch_id == branch_id:

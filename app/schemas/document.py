@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel
-from app.models.enums import DocumentType, ValidationStatus, AllowedFileType
+
+from app.models.enums import DocumentType, ValidationStatus
+
 
 class DocumentResponse(BaseModel):
     id: uuid.UUID
@@ -12,12 +14,13 @@ class DocumentResponse(BaseModel):
     content_type: str
     file_size_bytes: int
     validation_status: ValidationStatus
-    validation_reason: Optional[str]
+    validation_reason: str | None
     uploaded_at: datetime
 
     class Config:
         from_attributes = True
 
+
 class DocumentValidationUpdateRequest(BaseModel):
     validation_status: ValidationStatus
-    validation_reason: Optional[str] = None
+    validation_reason: str | None = None

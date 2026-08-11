@@ -3,8 +3,8 @@ from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.tools import QueryEngineTool
 from llama_index.llms.google_genai import GoogleGenAI
 
+from app.ai.rag.query_engines import branch_eligibility_engine, offer_policy_engine
 from app.ai.tools.offer_query_tools import build_offer_query_tools
-from app.ai.rag.query_engines import offer_policy_engine, branch_eligibility_engine
 
 
 def build_offer_agent(llm: GoogleGenAI, db, application_id) -> FunctionAgent:
@@ -39,5 +39,10 @@ def build_offer_agent(llm: GoogleGenAI, db, application_id) -> FunctionAgent:
         ),
         llm=llm,
         tools=tools,
-        can_handoff_to=["application_agent", "document_agent", "loan_agent", "root_agent"],
+        can_handoff_to=[
+            "application_agent",
+            "document_agent",
+            "loan_agent",
+            "root_agent",
+        ],
     )
