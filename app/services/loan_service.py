@@ -3,6 +3,7 @@ import io
 import json
 import logging
 from datetime import datetime, timezone
+import uuid
 
 from fastapi import HTTPException, status
 from pypdf import PdfReader
@@ -18,7 +19,7 @@ from app.storage import StorageUploadError, storage_manager
 
 logger = logging.getLogger(__name__)
 
-llm = initialize_ai_environment()
+
 
 
 class IncomeExtractionError(Exception):
@@ -112,6 +113,7 @@ class LoanService:
     async def _extract_annual_income(self, file_bytes: bytes) -> float:
         """Single-purpose extraction: reads the stated annual parental income
         directly from in-memory PDF bytes, before anything is persisted."""
+        llm = initialize_ai_environment()
         pdf_text = await asyncio.to_thread(self._read_pdf_text, file_bytes)
         if not pdf_text.strip():
             raise IncomeExtractionError("Could not read any content from the uploaded document.")
@@ -159,3 +161,8 @@ class LoanService:
         if not loan_application:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "No loan application on record.")
         return loan_application
+
+    async def get_loan_application_by_application_id(self, application_id: uuid.UUID) -> LoanApplication:
+        return await self.loan_repository.get_by_application_id(application_id)
+
+    

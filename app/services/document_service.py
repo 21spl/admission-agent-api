@@ -16,7 +16,7 @@ from app.repositories.application_repository import ApplicationRepository
 from app.schemas.document import DocumentValidationUpdateRequest
 
 # import models
-from app.models.domain import Document, Student
+from app.models.domain import ApplicationStatusHistory, Document, Student
 from app.models.enums import DocumentType, ValidationStatus, ApplicationStatus, AllowedFileType
 from app.models.enums import DocumentType, ValidationStatus, ApplicationStatus, AllowedFileType, AI_MANAGED_TYPES
 
@@ -96,7 +96,7 @@ class DocumentService:
 
 
 
-#=============================================== LIST ALL DOCUMENTS FOR AN APPLICATION =========================================
+#================================ LIST ALL DOCUMENTS FOR AN APPLICATION ===========================    
     async def list_application_documents(self, application_id: uuid.UUID) -> List[Document]:
         return await self.repository.get_by_application_id(application_id)
 
@@ -141,82 +141,85 @@ class DocumentService:
 
 
 
-#=================================== MARK AUTO VALIDATED BY AI ===================================
-
-
     async def mark_auto_validated(self, application_id: uuid.UUID, doc_types: list[str]) -> None:
         application = await self.application_repository.get_by_id(application_id)
-        # only change the non-status fields and update
+        if not application:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application entry not found.")
+
+        old_status = application.status
         application.validation_flags = 0
         application.validation_issues = None
-        await self.application_repository.update(application)
+        application.status = ApplicationStatus.VALIDATED
+        application.history.append(
+            ApplicationStatusHistory(old_status=old_status, new_status=ApplicationStatus.VALIDATED, changed_by="AI")
+        )
 
-        # now mark all the documments VALID
         all_docs = await self.repository.get_by_application_id(application_id)
         for doc in all_docs:
             if doc.doc_type in doc_types:
                 doc.validation_status = ValidationStatus.VALID.value
                 doc.validation_reason = None
-                await self.repository.update(doc)
 
-        # now only update the application status
-        await self.application_service.update_application_status(application_id, ApplicationStatus.VALIDATED, "AI")
-
-
-
-#=================================== MARK AUTO REJECTED BY AI ===================================
+        await self.repository.db.commit()
 
 
     async def mark_auto_rejected(self, application_id: uuid.UUID, reason: str, doc_types: list[str]) -> None:
         application = await self.application_repository.get_by_id(application_id)
-        # only change the non-status fields and update
+        if not application:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application entry not found.")
+
+        old_status = application.status
         application.validation_issues = reason
-        await self.application_repository.update(application)
+        application.status = ApplicationStatus.REJECTED
+        application.history.append(
+            ApplicationStatusHistory(old_status=old_status, new_status=ApplicationStatus.REJECTED, changed_by="AI")
+        )
 
         all_docs = await self.repository.get_by_application_id(application_id)
         for doc in all_docs:
             if doc.doc_type in doc_types:
                 doc.validation_status = ValidationStatus.INVALID.value
                 doc.validation_reason = reason
-                await self.repository.update(doc)
 
-        # now only update the application status
-        await self.application_service.update_application_status(application_id, ApplicationStatus.REJECTED, "AI")
+        await self.repository.db.commit()
 
-
-
-#=================================== MARK AUTO PENDING BY AI ===================================
 
     async def mark_auto_pending(
         self, application_id: uuid.UUID, flags: int, issues: str, doc_types: list[str]
     ) -> None:
         application = await self.application_repository.get_by_id(application_id)
-        # only change the non-status fields and update
+        if not application:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application entry not found.")
+
+        old_status = application.status
         application.validation_flags = flags
         application.validation_issues = issues
-        await self.application_repository.update(application)
+        application.status = ApplicationStatus.PENDING_REVIEW
+        application.history.append(
+            ApplicationStatusHistory(old_status=old_status, new_status=ApplicationStatus.PENDING_REVIEW, changed_by="AI")
+        )
 
         all_docs = await self.repository.get_by_application_id(application_id)
         for doc in all_docs:
             if doc.doc_type in doc_types:
                 doc.validation_status = ValidationStatus.PENDING.value
                 doc.validation_reason = None
-                await self.repository.update(doc)
+                # Individual Document.validation_status intentionally left as PENDING here —
+                # the grey-zone case needs a human decision before any doc gets flipped to
+                # VALID/INVALID. The admin's eventual decision (submit_review_decision)
+                # resolves this via mark_validated/mark_rejected.
 
-        # now only update the application status
-        await self.application_service.update_application_status(application_id, ApplicationStatus.PENDING_REVIEW, "AI")
-
-
-        # Individual Document.validation_status intentionally left as PENDING here —
-        # the grey-zone case needs a human decision before any doc gets flipped to
-        # VALID/INVALID. The admin's eventual decision (submit_review_decision)
-        # resolves this via mark_validated/mark_rejected.
+        await self.repository.db.commit()
 
 
 # ================================== Get download link for a document ==================================
     async def get_download_link(self, document_id: uuid.UUID) -> str:
-        # get the document record from the database
         doc = await self.repository.get_by_id(document_id)
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document record not found."
+            )
         key = doc.storage_key
         link = await storage_manager.generate_presigned_url(key)
         return link

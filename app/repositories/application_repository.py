@@ -6,17 +6,21 @@ from app.models.enums import ApplicationStatus
 from app.repositories.base_repository import BaseRepository
 from app.models.domain import Application
 
+from sqlalchemy.orm import selectinload
+
 class ApplicationRepository(BaseRepository[Application]):
     def __init__(self, db):
         super().__init__(Application, db)
 
 
+
+
+
     async def get_by_student_id(self, student_id: uuid.UUID) -> Optional[Application]:
-        """Fetches an existing application record complete with eagerly pre-fetched preferences."""
         stmt = (
             select(Application)
             .where(Application.student_id == student_id)
-            .options(selectinload(Application.preferences))
+            .options(selectinload(Application.history), selectinload(Application.preferences))
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()

@@ -5,6 +5,7 @@ from the JWT before this factory is called. application_id is NEVER an
 LLM-fillable parameter.
 """
 from typing import List
+from fastapi import HTTPException
 from llama_index.core.tools import FunctionTool
 
 from app.models.enums import DocumentType
@@ -30,9 +31,11 @@ def build_document_query_tools(db, application_id) -> List[FunctionTool]:
 
     async def document_upload_pending() -> list[str]:
         """List required document types the student has NOT uploaded yet."""
-        application = await application_service.get_application_by_id(application_id)
-        if application is None:
-            return []
+        try:
+            application = await application_service.get_application_by_id(application_id)
+        except HTTPException:
+            return ["error", "No application found"]
+       
         all_docs = await document_service.list_application_documents(application_id)
         required_types = {DocumentType.CLASS12_MARKSHEET.value, DocumentType.ID_CARD.value}
         uploaded_types = {doc.doc_type for doc in all_docs}

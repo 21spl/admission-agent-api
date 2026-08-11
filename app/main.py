@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Depends
+from google.genai.client import _agent_experimental_warned
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.core.config import settings
 from app.database import get_db
-from app.routers import admin_shortlisting, auth, branch, document, loan, notification, offer, application_history, application, admin_review
+from app.routers import admin_shortlisting, auth, branch, document, loan, notification, offer, application_history, student_support
+from app.routers import application, admin_review
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -19,6 +21,7 @@ app.include_router(application_history.router)
 app.include_router(application.router)
 app.include_router(admin_review.router)
 app.include_router(admin_shortlisting.router)
+app.include_router(student_support.router)
 
 
 

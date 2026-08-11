@@ -2,6 +2,7 @@
 from typing import List
 from llama_index.core.tools import FunctionTool
 from app.core.factories import get_application_service, get_application_history_service
+from fastapi import HTTPException
 
 
 def build_application_query_tools(db, application_id) -> List[FunctionTool]:
@@ -10,9 +11,11 @@ def build_application_query_tools(db, application_id) -> List[FunctionTool]:
 
     async def get_my_application_status() -> dict:
         """Get the current status of the logged-in student's application."""
-        app_ = await application_service.get_application_by_id(application_id)
-        if app_ is None:
+        try:
+            app_ = await application_service.get_application_by_id(application_id)
+        except HTTPException:
             return {"error": "No application found."}
+
         return {"application_id": str(app_.id), "status": app_.status}
 
     async def get_my_application_status_history() -> list[dict]:
@@ -26,7 +29,16 @@ def build_application_query_tools(db, application_id) -> List[FunctionTool]:
             for h in history_list
         ]
 
+    async def inspect_validation_issue() -> dict:
+            """Get validation issues/blockages currently flagged on this application's documents."""
+            application = await application_service.get_application_by_id(application_id)
+            if application is None:
+                return {"error": "No application found."}
+            return {"validation_issues": application.validation_issues}
+
     return [
+        FunctionTool.from_defaults(async_fn=inspect_validation_issue, name="inspect_validation_issue",
+            description="Get validation issues/blockages currently flagged on this application's documents."),
         FunctionTool.from_defaults(async_fn=get_my_application_status, name="get_student_application_status",
             description="Retrieves the current status of the logged-in student's application."),
         FunctionTool.from_defaults(async_fn=get_my_application_status_history, name="get_student_application_history",

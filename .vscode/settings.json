@@ -22,5 +22,10 @@
     "windsurfPyright.analysis.inlayHints.functionReturnTypes": true,
     "windsurfPyright.analysis.inlayHints.genericTypes": true,
     "windsurfPyright.analysis.inlayHints.variableTypes": true,
-    "editor.codeActions.triggerOnFocusChange": true
+    "editor.codeActions.triggerOnFocusChange": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }
