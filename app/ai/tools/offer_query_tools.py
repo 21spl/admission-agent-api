@@ -2,6 +2,7 @@
 from typing import List
 from llama_index.core.tools import FunctionTool
 from app.core.factories import get_offer_service, get_application_service, get_branch_service
+from fastapi import HTTPException
 
 
 def build_offer_query_tools(db, application_id) -> List[FunctionTool]:
@@ -11,7 +12,7 @@ def build_offer_query_tools(db, application_id) -> List[FunctionTool]:
 
     async def get_my_offers() -> list[dict]:
         """Get all branch/course offers extended to the logged-in student's application."""
-        offer_list = await offer_service.list_my_offers(application_id)
+        offer_list = await offer_service.list_offers_for_application(application_id)
         results = []
         for offer in offer_list:
             branch = await branch_service.get_branch(offer.branch_id)
@@ -23,7 +24,11 @@ def build_offer_query_tools(db, application_id) -> List[FunctionTool]:
 
     async def get_my_branch_preferences() -> list[dict]:
         """Get the logged-in student's ranked branch preferences and whether each was offered."""
-        application = await application_service.get_application_by_id(application_id)
+        try:
+            application = await application_service.get_application_by_id(application_id)
+        except HTTPException:
+            return [{"error": "No application found."}]
+        
         results = []
         for pref in application.preferences:
             branch = await branch_service.get_branch(pref.branch_id)

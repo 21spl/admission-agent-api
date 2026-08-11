@@ -52,9 +52,11 @@ def build_document_query_tools(db, application_id) -> List[FunctionTool]:
 
     async def inspect_validation_issue() -> dict:
         """Get validation issues/blockages currently flagged on this application's documents."""
-        application = await application_service.get_application_by_id(application_id)
-        if application is None:
+        try:
+            application = await application_service.get_application_by_id(application_id)
+        except HTTPException:
             return {"error": "No application found."}
+
         return {"validation_issues": application.validation_issues}
 
     return [

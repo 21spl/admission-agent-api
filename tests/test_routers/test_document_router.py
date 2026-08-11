@@ -1,26 +1,24 @@
 
-
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.dependencies import (
-    get_current_student,
-    validate_uploaded_file_type,
-)
 from app.core.factories import (
-    get_document_service,
     get_application_repository,
+    get_document_service,
     get_student_repository,
 )
-from app.models.enums import DocumentType
 from app.main import app
+from app.models.enums import DocumentType, ValidationStatus
+from app.schemas.document import DocumentResponse
 
 
 # ============================================================
 # Helpers
 # ============================================================
+
 
 async def _get_student_token(client, test_student):
     response = await client.post(
@@ -48,34 +46,46 @@ def _clear_document_service_override():
 # POST /documents/upload
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_upload_document_success(
     client,
     test_student,
+    test_application,
 ):
     token = await _get_student_token(client, test_student)
 
+    document_id = uuid.uuid4()
+    doc_type = next(iter(DocumentType))
+
+    document_response = DocumentResponse(
+        id=document_id,
+        application_id=test_application.id,
+        doc_type=doc_type,
+        storage_key="documents/test/marksheet.pdf",
+        content_type="application/pdf",
+        file_size_bytes=len(b"fake pdf content"),
+        validation_status=ValidationStatus.PENDING,
+        validation_reason=None,
+        uploaded_at=datetime.now(timezone.utc),
+    )
+
     service = MagicMock()
+
     service.upload_document_metadata = AsyncMock(
-        return_value=MagicMock(
-            id=uuid.uuid4(),
-            document_type=next(iter(DocumentType)),
-            filename="marksheet.pdf",
-        )
+        return_value=document_response
     )
 
     _override_document_service(service)
 
     try:
-        doc_type = next(iter(DocumentType)).value
-
         response = await client.post(
             "/documents/upload",
             headers={
                 "Authorization": f"Bearer {token}",
             },
             data={
-                "doc_type": doc_type,
+                "doc_type": doc_type.value,
             },
             files={
                 "file": (
@@ -85,11 +95,21 @@ async def test_upload_document_success(
                 ),
             },
         )
-
     finally:
         _clear_document_service_override()
 
     assert response.status_code == 201
+
+    data = response.json()
+
+    assert data["id"] == str(document_id)
+    assert data["application_id"] == str(test_application.id)
+    assert data["doc_type"] == doc_type.value
+    assert data["storage_key"] == "documents/test/marksheet.pdf"
+    assert data["content_type"] == "application/pdf"
+    assert data["file_size_bytes"] == len(b"fake pdf content")
+    assert data["validation_status"] == ValidationStatus.PENDING.value
+    assert data["validation_reason"] is None
 
     service.upload_document_metadata.assert_awaited_once()
 
@@ -229,6 +249,7 @@ async def test_upload_document_rejects_missing_document_type(
 # POST /documents/applications/{application_id}/documents/validate
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_request_document_validation_success(
     client,
@@ -246,13 +267,17 @@ async def test_request_document_validation_success(
     application_repository = MagicMock()
     student_repository = MagicMock()
 
-    app.dependency_overrides[get_document_service] = lambda: service
-    app.dependency_overrides[
-        get_application_repository
-    ] = lambda: application_repository
-    app.dependency_overrides[
-        get_student_repository
-    ] = lambda: student_repository
+    app.dependency_overrides[get_document_service] = (
+        lambda: service
+    )
+
+    app.dependency_overrides[get_application_repository] = (
+        lambda: application_repository
+    )
+
+    app.dependency_overrides[get_student_repository] = (
+        lambda: student_repository
+    )
 
     workflow_result = {
         "status": "completed",
@@ -260,11 +285,13 @@ async def test_request_document_validation_success(
     }
 
     try:
+        # Patch the class where the router uses it.
         with patch(
-            "app.ai.workflows.document_validation_workflow.DocumentValidationWorkflow"
+            "app.routers.document.DocumentValidationWorkflow"
         ) as workflow_class:
 
             workflow = MagicMock()
+
             workflow.run = AsyncMock(
                 return_value=workflow_result
             )
@@ -272,7 +299,8 @@ async def test_request_document_validation_success(
             workflow_class.return_value = workflow
 
             response = await client.post(
-                f"/documents/applications/{test_application.id}/documents/validate",
+                f"/documents/applications/"
+                f"{test_application.id}/documents/validate",
                 headers={
                     "Authorization": f"Bearer {token}",
                 },
@@ -283,10 +311,12 @@ async def test_request_document_validation_success(
             get_document_service,
             None,
         )
+
         app.dependency_overrides.pop(
             get_application_repository,
             None,
         )
+
         app.dependency_overrides.pop(
             get_student_repository,
             None,
@@ -303,7 +333,7 @@ async def test_request_document_validation_success(
         document_service=service,
         application_repository=application_repository,
         student_repository=student_repository,
-        llm=workflow_class.call_args.kwargs["llm"],
+        llm=ANY,
         timeout=120,
         verbose=False,
     )
@@ -331,7 +361,8 @@ async def test_request_document_validation_returns_400_when_not_all_documents_up
 
     try:
         response = await client.post(
-            f"/documents/applications/{test_application.id}/documents/validate",
+            f"/documents/applications/"
+            f"{test_application.id}/documents/validate",
             headers={
                 "Authorization": f"Bearer {token}",
             },
@@ -340,7 +371,10 @@ async def test_request_document_validation_returns_400_when_not_all_documents_up
         _clear_document_service_override()
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "All document types not uploaded"
+
+    assert response.json()["detail"] == (
+        "All document types not uploaded"
+    )
 
     service.check_all_document_types_uploaded.assert_awaited_once_with(
         test_application.id
@@ -353,7 +387,8 @@ async def test_request_document_validation_requires_authentication(
     test_application,
 ):
     response = await client.post(
-        f"/documents/applications/{test_application.id}/documents/validate",
+        f"/documents/applications/"
+        f"{test_application.id}/documents/validate",
     )
 
     assert response.status_code == 403
@@ -365,7 +400,8 @@ async def test_request_document_validation_rejects_invalid_token(
     test_application,
 ):
     response = await client.post(
-        f"/documents/applications/{test_application.id}/documents/validate",
+        f"/documents/applications/"
+        f"{test_application.id}/documents/validate",
         headers={
             "Authorization": "Bearer invalid-token",
         },
@@ -389,8 +425,4 @@ async def test_request_document_validation_rejects_invalid_application_id(
     )
 
     assert response.status_code == 422
-
-
-
-
 
