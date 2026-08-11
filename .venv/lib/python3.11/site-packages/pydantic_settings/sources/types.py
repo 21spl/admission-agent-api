@@ -2,9 +2,15 @@
 
 from __future__ import annotations as _annotations
 
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
+
+if sys.version_info >= (3, 11):
+    from importlib.resources.abc import Traversable as Traversable  # noqa: PLC0414  (explicit re-export)
+else:
+    from importlib.abc import Traversable as Traversable  # noqa: PLC0414  (explicit re-export)
 
 if TYPE_CHECKING:
     from pydantic._internal._dataclasses import PydanticDataclass
@@ -22,18 +28,19 @@ class EnvNoneType(str):
 class NoDecode:
     """Annotation to prevent decoding of a field value."""
 
-    pass
-
 
 class ForceDecode:
     """Annotation to force decoding of a field value."""
-
-    pass
 
 
 EnvPrefixTarget = Literal['variable', 'alias', 'all']
 DotenvType = Path | str | Sequence[Path | str]
 PathType = Path | str | Sequence[Path | str]
+# Config file sources (json/toml/yaml) additionally accept packaged resources exposed as a
+# `Traversable` (e.g. `importlib.resources.files(...).joinpath(...)`), including non-filesystem
+# ones such as a file inside a zip/wheel.
+# See https://github.com/pydantic/pydantic-settings/issues/299
+ConfigFileSourceType = Path | str | Traversable | Sequence[Path | str | Traversable]
 DotenvFiltering = Literal['match_prefix', 'only_existing']
 DEFAULT_PATH: PathType = Path('')
 
@@ -82,19 +89,20 @@ class SecretVersion:
 __all__ = [
     'DEFAULT_PATH',
     'ENV_FILE_SENTINEL',
-    'EnvPrefixTarget',
+    'ConfigFileSourceType',
     'DotenvType',
     'EnvNoneType',
+    'EnvPrefixTarget',
     'ForceDecode',
     'NoDecode',
     'PathType',
     'PydanticModel',
     'SecretVersion',
+    '_CliDualFlag',
     '_CliExplicitFlag',
     '_CliImplicitFlag',
-    '_CliToggleFlag',
-    '_CliDualFlag',
     '_CliPositionalArg',
     '_CliSubCommand',
+    '_CliToggleFlag',
     '_CliUnknownArgs',
 ]

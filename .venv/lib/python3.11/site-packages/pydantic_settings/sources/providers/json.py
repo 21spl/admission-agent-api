@@ -3,17 +3,21 @@
 from __future__ import annotations as _annotations
 
 import json
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
 )
 
 from ..base import ConfigFileSourceMixin, InitSettingsSource
-from ..types import DEFAULT_PATH, PathType
+from ..types import DEFAULT_PATH, ConfigFileSourceType
+from ..utils import InitState
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pydantic_settings.main import BaseSettings
+
+    from ..types import Traversable
 
 
 class JsonConfigSettingsSource(InitSettingsSource, ConfigFileSourceMixin):
@@ -24,9 +28,10 @@ class JsonConfigSettingsSource(InitSettingsSource, ConfigFileSourceMixin):
     def __init__(
         self,
         settings_cls: type[BaseSettings],
-        json_file: PathType | None = DEFAULT_PATH,
+        json_file: ConfigFileSourceType | None = DEFAULT_PATH,
         json_file_encoding: str | None = None,
         deep_merge: bool = False,
+        _init_state: InitState | None = None,
     ):
         self.json_file_path = json_file if json_file != DEFAULT_PATH else settings_cls.model_config.get('json_file')
         self.json_file_encoding = (
@@ -35,9 +40,9 @@ class JsonConfigSettingsSource(InitSettingsSource, ConfigFileSourceMixin):
             else settings_cls.model_config.get('json_file_encoding')
         )
         self.json_data = self._read_files(self.json_file_path, deep_merge=deep_merge)
-        super().__init__(settings_cls, self.json_data)
+        super().__init__(settings_cls, self.json_data, _init_state=_init_state)
 
-    def _read_file(self, file_path: Path) -> dict[str, Any]:
+    def _read_file(self, file_path: Path | Traversable) -> dict[str, Any]:
         with file_path.open(encoding=self.json_file_encoding) as json_file:
             return json.load(json_file)
 

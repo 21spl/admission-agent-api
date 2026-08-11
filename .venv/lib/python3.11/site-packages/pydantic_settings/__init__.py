@@ -1,4 +1,4 @@
-from .exceptions import SettingsError
+from .exceptions import IncompleteFieldDefinitionWarning, SettingsError
 from .main import BaseSettings, CliApp, SettingsConfigDict
 from .sources import (
     CLI_SUPPRESS,
@@ -37,20 +37,21 @@ __all__ = (
     'AzureKeyVaultSettingsSource',
     'BaseSettings',
     'CliApp',
+    'CliDualFlag',
     'CliExplicitFlag',
     'CliImplicitFlag',
-    'CliToggleFlag',
-    'CliDualFlag',
     'CliMutuallyExclusiveGroup',
     'CliPositionalArg',
     'CliSettingsSource',
     'CliSubCommand',
     'CliSuppress',
+    'CliToggleFlag',
     'CliUnknownArgs',
     'DotEnvSettingsSource',
     'EnvSettingsSource',
     'ForceDecode',
     'GoogleSecretManagerSettingsSource',
+    'IncompleteFieldDefinitionWarning',
     'InitSettingsSource',
     'JsonConfigSettingsSource',
     'NestedSecretsSettingsSource',

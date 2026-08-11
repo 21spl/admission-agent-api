@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from pydantic.alias_generators import to_snake
 from pydantic.fields import FieldInfo
 
+from ..utils import InitState
 from .env import EnvSettingsSource
 
 if TYPE_CHECKING:
@@ -117,6 +118,7 @@ class AzureKeyVaultSettingsSource(EnvSettingsSource):
         env_prefix: str | None = None,
         env_parse_none_str: str | None = None,
         env_parse_enums: bool | None = None,
+        _init_state: InitState | None = None,
     ) -> None:
         import_azure_key_vault()
         self._url = url
@@ -131,6 +133,7 @@ class AzureKeyVaultSettingsSource(EnvSettingsSource):
             env_ignore_empty=False,
             env_parse_none_str=env_parse_none_str,
             env_parse_enums=env_parse_enums,
+            _init_state=_init_state,
         )
 
     def _load_env_vars(self) -> Mapping[str, str | None]:
@@ -144,11 +147,11 @@ class AzureKeyVaultSettingsSource(EnvSettingsSource):
 
     def _extract_field_info(self, field: FieldInfo, field_name: str) -> list[tuple[str, str, bool]]:
         if self._snake_case_conversion:
-            field_info = list((x[0], x[1], x[2]) for x in super()._extract_field_info(field, field_name))
+            field_info = [(x[0], x[1], x[2]) for x in super()._extract_field_info(field, field_name)]
             return field_info
 
         if self._dash_to_underscore:
-            return list((x[0], x[1].replace('_', '-'), x[2]) for x in super()._extract_field_info(field, field_name))
+            return [(x[0], x[1].replace('_', '-'), x[2]) for x in super()._extract_field_info(field, field_name)]
 
         return super()._extract_field_info(field, field_name)
 

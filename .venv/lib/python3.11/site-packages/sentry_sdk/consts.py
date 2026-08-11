@@ -695,6 +695,12 @@ class SPANDATA:
     Example: 0.1
     """
 
+    GEN_AI_REQUEST_REASONING_LEVEL = "gen_ai.request.reasoning.level"
+    """
+    The reasoning or thinking effort level requested for a GenAI model.
+    Example: "high"
+    """
+
     GEN_AI_REQUEST_SEED = "gen_ai.request.seed"
     """
     The seed, ideally models given the same seed and same other parameters will produce the exact same output.
@@ -776,6 +782,20 @@ class SPANDATA:
     Example: "rainy, 57°F"
     """
 
+    GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS = "gen_ai.usage.cache_read.input_tokens"
+    """
+    The number of cached tokens used to process the AI input (prompt).
+    Example: 50
+    """
+
+    GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS = (
+        "gen_ai.usage.cache_creation.input_tokens"
+    )
+    """
+    The number of tokens written to the cache when processing the AI input (prompt).
+    Example: 100
+    """
+
     GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
     """
     The number of tokens in the input.
@@ -792,6 +812,12 @@ class SPANDATA:
     """
     The number of tokens written to the cache when processing the AI input (prompt).
     Example: 100
+    """
+
+    GEN_AI_USAGE_REASONING_OUTPUT_TOKENS = "gen_ai.usage.reasoning.output_tokens"
+    """
+    The number of tokens used for reasoning to create the AI output.
+    Example: 75
     """
 
     GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
@@ -1251,6 +1277,7 @@ class OP:
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
     TEMPLATE_RENDER = "template.render"
+    VIEW_AUTHENTICATE = "view.authenticate"
     VIEW_RENDER = "view.render"
     VIEW_RESPONSE_RENDER = "view.response.render"
     WEBSOCKET_SERVER = "websocket.server"
@@ -1336,6 +1363,7 @@ class ClientConstructor:
         trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
         enable_metrics: bool = True,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
+        before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
         stream_gen_ai_spans: bool = True,
@@ -1756,6 +1784,11 @@ class ClientConstructor:
             but you can provide it explicitly for self-hosted and Relay setups. This value is used for
             trace propagation and for features like `strict_trace_continuation`.
 
+        :param before_send_span: An optional function to modify spans before they're sent to Sentry.
+            Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
+            and ``before_send_metric``, spans cannot be dropped by returning None. Only works when
+            ``trace_lifecycle="stream"`` is enabled.
+
         :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
             reduce downstream data loss.
 
@@ -1807,4 +1840,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.66.1"
+VERSION = "2.67.1"

@@ -183,7 +183,7 @@ if TYPE_CHECKING:
         cookies: "KeyValueCollectionBehaviour"
         http_headers: "HttpHeadersCollectionUserOptions"
         http_bodies: "List[str]"
-        query_params: "KeyValueCollectionBehaviour"
+        url_query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionUserOptions"
         gen_ai: "GenAICollectionUserOptions"
         database_query_data: bool
@@ -197,7 +197,7 @@ if TYPE_CHECKING:
         cookies: "KeyValueCollectionBehaviour"
         http_headers: "HttpHeadersCollectionBehaviour"
         http_bodies: "List[str]"
-        query_params: "KeyValueCollectionBehaviour"
+        url_query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionBehaviour"
         gen_ai: "GenAICollectionBehaviour"
         database_query_data: bool
@@ -471,6 +471,21 @@ if TYPE_CHECKING:
     class TextPart(TypedDict):
         type: Literal["text"]
         content: str
+
+    class ReasoningPart(TypedDict):
+        type: Literal["reasoning"]
+        content: str
+
+    class ToolCallPart(TypedDict):
+        type: Literal["tool_call"]
+        name: NotRequired[str]
+        arguments: NotRequired[Any]
+
+    class ToolDefinition(TypedDict):
+        type: str
+        name: NotRequired[str]
+        description: NotRequired[str]
+        parameters: NotRequired[dict[str, object]]
 
     IgnoreSpansName = Union[str, Pattern[str]]
     IgnoreSpansContext = TypedDict(

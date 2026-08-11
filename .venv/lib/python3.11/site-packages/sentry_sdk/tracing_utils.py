@@ -27,6 +27,7 @@ from sentry_sdk.utils import (
     _module_in_list,
     capture_internal_exceptions,
     filename_for_module,
+    has_data_collection_enabled,
     is_sentry_url,
     is_valid_sample_rate,
     logger,
@@ -145,15 +146,27 @@ def record_sql_queries(
 ) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
     # TODO: Bring back capturing of params by default
     client = sentry_sdk.get_client()
-    if client.options["_experiments"].get("record_sql_params", False):
-        if not params_list or params_list == [None]:
-            params_list = None
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["database_query_data"]:
+            if not params_list or params_list == [None]:
+                params_list = None
 
-        if paramstyle == "pyformat":
-            paramstyle = "format"
+            if paramstyle == "pyformat":
+                paramstyle = "format"
+        else:
+            params_list = None
+            paramstyle = None
     else:
-        params_list = None
-        paramstyle = None
+        # TODO: remove this else block once data collection is released
+        if client.options["_experiments"].get("record_sql_params", False):
+            if not params_list or params_list == [None]:
+                params_list = None
+
+            if paramstyle == "pyformat":
+                paramstyle = "format"
+        else:
+            params_list = None
+            paramstyle = None
 
     query = _format_sql(cursor, query)
 
@@ -200,12 +213,7 @@ def record_sql_queries(
 def maybe_create_breadcrumbs_from_span(
     scope: "sentry_sdk.Scope", span: "sentry_sdk.tracing.Span"
 ) -> None:
-    if span.op == OP.DB_REDIS:
-        scope.add_breadcrumb(
-            message=span.description, type="redis", category="redis", data=span._tags
-        )
-
-    elif span.op == OP.HTTP_CLIENT:
+    if span.op == OP.HTTP_CLIENT:
         level = None
         status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)
         if status_code:
@@ -220,14 +228,6 @@ def maybe_create_breadcrumbs_from_span(
             )
         else:
             scope.add_breadcrumb(type="http", category="httplib", data=span._data)
-
-    elif span.op == "subprocess":
-        scope.add_breadcrumb(
-            type="subprocess",
-            category="subprocess",
-            message=span.description,
-            data=span._data,
-        )
 
 
 def _get_frame_module_abs_path(frame: "FrameType") -> "Optional[str]":
@@ -1575,20 +1575,6 @@ def add_sentry_baggage_to_headers(
     )
 
 
-def _get_effective_sample_rate(
-    client: "Any", propagation_context: "PropagationContext"
-) -> "Union[float, bool]":
-    if propagation_context.parent_sampled is not None:
-        propagation_context_sample_rate = propagation_context._sample_rate()
-
-        if propagation_context_sample_rate is not None:
-            return propagation_context_sample_rate
-        else:
-            return propagation_context.parent_sampled
-    else:
-        return client.options["traces_sample_rate"]
-
-
 def _make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
@@ -1651,13 +1637,15 @@ def _make_sampling_decision(
                 "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
                 exc_info=True,
             )
-            sample_rate = _get_effective_sample_rate(
-                client=client, propagation_context=propagation_context
-            )
+            if propagation_context.parent_sampled is not None:
+                sample_rate = propagation_context.parent_sampled
+            else:
+                sample_rate = client.options["traces_sample_rate"]
     else:
-        sample_rate = _get_effective_sample_rate(
-            client=client, propagation_context=propagation_context
-        )
+        if propagation_context.parent_sampled is not None:
+            sample_rate = propagation_context.parent_sampled
+        else:
+            sample_rate = client.options["traces_sample_rate"]
 
     # Validate whether the sample_rate we got is actually valid. Since
     # traces_sampler is user-provided, it could return anything.

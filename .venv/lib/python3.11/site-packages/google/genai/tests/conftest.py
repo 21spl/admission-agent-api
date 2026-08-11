@@ -56,23 +56,22 @@ def use_vertex():
 
 
 @pytest.fixture(autouse=True)
-def skip_vertex_in_api_mode(request):
+def skip_based_on_api_mode_env_vars(request):
   mode = request.config.getoption('--mode')
-  if mode == 'api' and not os.environ.get(
-      'GOOGLE_GENAI_RUN_VERTEX_IN_API_MODE'
-  ):
+  if mode == 'api':
+    use_vertex = None
     if hasattr(request, 'node') and hasattr(request.node, 'callspec'):
-      if request.node.callspec.params.get('use_vertex') is True:
-        pytest.skip(
-            'Skipping Vertex AI tests in API mode (no GCP credentials'
-            ' configured).'
-        )
+      use_vertex = request.node.callspec.params.get('use_vertex')
     elif 'use_vertex' in request.fixturenames:
-      if request.getfixturevalue('use_vertex') is True:
-        pytest.skip(
-            'Skipping Vertex AI tests in API mode (no GCP credentials'
-            ' configured).'
-        )
+      use_vertex = request.getfixturevalue('use_vertex')
+
+    run_vertex_only = os.environ.get('GOOGLE_GENAI_RUN_VERTEX_ONLY_IN_API_MODE')
+    run_gemini_only = os.environ.get('GOOGLE_GENAI_RUN_GEMINI_ONLY_IN_API_MODE')
+
+    if use_vertex is True and run_gemini_only:
+      pytest.skip('Skipping Vertex AI tests in API mode (GEMINI ONLY config enabled).')
+    elif use_vertex is False and run_vertex_only:
+      pytest.skip('Skipping Gemini API tests in API mode (VERTEX ONLY config enabled).')
 
 
 # Overridden at the module level for each test file.

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional
 from ...exceptions import SettingsError
 from ...utils import path_type_label
 from ..base import PydanticBaseSettingsSource
-from ..utils import parse_env_vars
+from ..utils import InitState, parse_env_vars
 from .env import EnvSettingsSource
 from .secrets import SecretsSettingsSource
 
@@ -34,6 +34,7 @@ class NestedSecretsSettingsSource(EnvSettingsSource):
         # args for compatibility with SecretsSettingsSource, don't use directly
         case_sensitive: bool | None = None,
         env_prefix: str | None = None,
+        _init_state: InitState | None = None,
     ) -> None:
         # We allow the first argument to be settings_cls like original
         # SecretsSettingsSource. However, it is recommended to pass
@@ -106,7 +107,7 @@ class NestedSecretsSettingsSource(EnvSettingsSource):
         for path in self.secrets_paths:
             self.validate_secrets_path(path)
 
-        # construct parent
+        # construct parent, inheriting the init state of the wrapped source if not provided
         super().__init__(
             settings_cls,
             case_sensitive=self.case_sensitive,
@@ -115,6 +116,7 @@ class NestedSecretsSettingsSource(EnvSettingsSource):
             env_ignore_empty=False,  # match SecretsSettingsSource behaviour
             env_parse_enums=True,  # we can pass everything here, it will still behave as "True"
             env_parse_none_str=None,  # match SecretsSettingsSource behaviour
+            _init_state=_init_state if _init_state is not None else getattr(file_secret_settings, '_init_state', None),
         )
         self.env_parse_none_str = None  # update manually because of None
 
@@ -200,7 +202,9 @@ class NestedSecretsSettingsSource(EnvSettingsSource):
 
     @classmethod
     def load_secrets(cls, path: Path) -> dict[str, str]:
-        return {str(p.relative_to(path)): p.read_text().strip() for p in cls._iter_secret_files(path)}
+        # Explicit encoding, matching SecretsSettingsSource: the locale default would
+        # corrupt UTF-8 secrets on a non-UTF-8 Windows code page.
+        return {str(p.relative_to(path)): p.read_text(encoding='utf-8').strip() for p in cls._iter_secret_files(path)}
 
     def __repr__(self) -> str:
         return f'NestedSecretsSettingsSource(secrets_dir={self.secrets_dir!r})'

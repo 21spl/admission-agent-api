@@ -57,6 +57,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     exc_info_from_error,
     format_attribute,
+    has_data_collection_enabled,
     has_logs_enabled,
     has_metrics_enabled,
     logger,
@@ -1089,10 +1090,10 @@ class Scope:
         if crumb.get("type") is None:
             crumb["type"] = "default"
 
+        new_crumb = crumb
         if before_breadcrumb is not None:
-            new_crumb = before_breadcrumb(crumb, hint)
-        else:
-            new_crumb = crumb
+            with capture_internal_exceptions():
+                new_crumb = before_breadcrumb(crumb, hint)
 
         if new_crumb is not None:
             self._breadcrumbs.append(new_crumb)
@@ -1775,7 +1776,11 @@ class Scope:
         else:
             attributes = telemetry._attributes
 
-        if not should_send_default_pii() or self._user is None:
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if not client_options["data_collection"]["user_info"] or self._user is None:
+                return
+        elif not should_send_default_pii() or self._user is None:
             return
 
         for attribute_name, user_attribute in (
@@ -2022,10 +2027,20 @@ class Scope:
         """
         Set an attribute on the scope.
 
-        Any attributes-based telemetry (logs, metrics) captured while this scope
-        is active will inherit attributes set on the scope.
+        Any attributes-based telemetry (logs, metrics, streamed spans) captured
+        while this scope is active will inherit attributes set on the scope.
         """
         self._attributes[attribute] = format_attribute(value)
+
+    def set_attributes(self, attributes: "dict[str, AttributeValue]") -> None:
+        """
+        Set multiple attributes on the scope.
+
+        Any attributes-based telemetry (logs, metrics, streamed spans) captured
+        while this scope is active will inherit attributes set on the scope.
+        """
+        for attribute, value in attributes.items():
+            self.set_attribute(attribute, value)
 
     def remove_attribute(self, attribute: str) -> None:
         """Remove an attribute if set on the scope. No-op if there is no such attribute."""

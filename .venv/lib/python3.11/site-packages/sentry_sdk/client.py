@@ -63,6 +63,7 @@ from sentry_sdk.utils import (
     get_sdk_name,
     get_type_name,
     handle_in_app,
+    has_data_collection_enabled,
     has_logs_enabled,
     has_metrics_enabled,
     logger,
@@ -351,12 +352,20 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
 
     rv["data_collection"] = _resolve_data_collection(rv)
 
-    if rv["event_scrubber"] is None:
+    # Do not add the event scrubber if data collection is enabled as it can remove data that's
+    # collected under data collection config
+    if not has_data_collection_enabled(rv) and rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(
             send_default_pii=False
             if rv["send_default_pii"] is None
             else rv["send_default_pii"]
         )
+    elif has_data_collection_enabled(rv) and rv["event_scrubber"]:
+        warnings.warn(
+            "Event scrubbers are not enabled when data collection configuration is provided. Ignoring event_scrubber...",
+            stacklevel=2,
+        )
+        rv["event_scrubber"] = None
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
@@ -388,15 +397,13 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             stacklevel=2,
         )
 
+    if rv["before_send_span"] and not has_span_streaming_enabled(rv):
+        warnings.warn(
+            "The `before_send_span` parameter only works when `trace_lifecycle` is set to `stream`.",
+            stacklevel=2,
+        )
+
     return rv
-
-
-try:
-    # Python 3.6+
-    module_not_found_error = ModuleNotFoundError
-except Exception:
-    # Older Python versions
-    module_not_found_error = ImportError  # type: ignore
 
 
 class BaseClient:
@@ -550,7 +557,7 @@ class _Client(BaseClient):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
                 logger.debug("Enabled tracing for %s", function_qualname)
-            except module_not_found_error:
+            except ModuleNotFoundError:
                 try:
                     # Try to import a class
                     # ex: "mymodule.submodule.MyClassName.member_function"

@@ -30,6 +30,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     logger,
     transaction_from_function,
     walk_exception_chain,
@@ -297,6 +298,10 @@ def _patch_drf() -> None:
     DRF request object, such that we can later use either in
     `DjangoRequestExtractor`.
 
+    We also patch DRF's authentication to create a span, so that the work done
+    by the configured authentication classes (which often involves database
+    queries) doesn't show up as part of the view itself.
+
     This function is not called directly on SDK setup, because importing almost
     any part of Django Rest Framework will try to access Django settings (where
     `sentry_sdk.init()` might be called from in the first place). Instead we
@@ -337,6 +342,43 @@ def _patch_drf() -> None:
                     return old_drf_initial(self, request, *args, **kwargs)
 
                 APIView.initial = sentry_patched_drf_initial
+
+        with capture_internal_exceptions():
+            try:
+                from rest_framework.request import Request  # type: ignore
+            except ImportError:
+                pass
+            else:
+                old_drf_authenticate = Request._authenticate
+
+                def sentry_patched_drf_authenticate(self: "Request") -> "Any":
+                    client = sentry_sdk.get_client()
+                    integration = client.get_integration(DjangoIntegration)
+                    # Nothing to time if there are no authenticators configured
+                    # for this view.
+                    if integration is None or not getattr(self, "authenticators", None):
+                        return old_drf_authenticate(self)
+
+                    if has_span_streaming_enabled(client.options):
+                        if sentry_sdk.traces.get_current_span() is None:
+                            return old_drf_authenticate(self)
+                        with sentry_sdk.traces.start_span(
+                            name="authenticate",
+                            attributes={
+                                "sentry.op": OP.VIEW_AUTHENTICATE,
+                                "sentry.origin": DjangoIntegration.origin,
+                            },
+                        ):
+                            return old_drf_authenticate(self)
+                    else:
+                        with sentry_sdk.start_span(
+                            op=OP.VIEW_AUTHENTICATE,
+                            name="authenticate",
+                            origin=DjangoIntegration.origin,
+                        ):
+                            return old_drf_authenticate(self)
+
+                Request._authenticate = sentry_patched_drf_authenticate
 
 
 def _patch_channels() -> None:
@@ -457,6 +499,39 @@ def _attempt_resolve_again(
     _set_transaction_name_and_source(scope, transaction_style, request)
 
 
+def _get_user_from_request_and_set_on_scope(request: "WSGIRequest") -> None:
+    user = getattr(request, "user", None)
+
+    # Evaluating a SimpleLazyObject in an async view can raise django.core.exceptions.SynchronousOnlyOperation.
+    # Exit early if the user has not been materialized yet.
+    is_lazy = isinstance(user, SimpleLazyObject)
+    if is_lazy and hasattr(request, "_cached_user"):
+        user = request._cached_user
+    elif is_lazy:
+        return
+
+    if user is None or not is_authenticated(user):
+        return
+
+    user_info = {}
+    try:
+        user_info["id"] = str(user.pk)
+    except Exception:
+        pass
+
+    try:
+        user_info["email"] = user.email
+    except Exception:
+        pass
+
+    try:
+        user_info["username"] = user.get_username()
+    except Exception:
+        pass
+
+    sentry_sdk.set_user(user_info)
+
+
 def _after_get_response(request: "WSGIRequest") -> None:
     client = sentry_sdk.get_client()
     integration = client.get_integration(DjangoIntegration)
@@ -468,37 +543,12 @@ def _after_get_response(request: "WSGIRequest") -> None:
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     span_streaming = has_span_streaming_enabled(client.options)
-    if span_streaming and should_send_default_pii():
-        user = getattr(request, "user", None)
-
-        # Evaluating a SimpleLazyObject in an async view can raise django.core.exceptions.SynchronousOnlyOperation.
-        # Exit early if the user has not been materialized yet.
-        is_lazy = isinstance(user, SimpleLazyObject)
-        if is_lazy and hasattr(request, "_cached_user"):
-            user = request._cached_user
-        elif is_lazy:
-            return
-
-        if user is None or not is_authenticated(user):
-            return
-
-        user_info = {}
-        try:
-            user_info["id"] = str(user.pk)
-        except Exception:
-            pass
-
-        try:
-            user_info["email"] = user.email
-        except Exception:
-            pass
-
-        try:
-            user_info["username"] = user.get_username()
-        except Exception:
-            pass
-
-        sentry_sdk.set_user(user_info)
+    if span_streaming:
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["user_info"]:
+                _get_user_from_request_and_set_on_scope(request)
+        elif should_send_default_pii():
+            _get_user_from_request_and_set_on_scope(request)
 
 
 def _patch_get_response() -> None:
@@ -544,7 +594,12 @@ def _make_wsgi_request_event_processor(
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                with capture_internal_exceptions():
+                    _set_user_info(request, event)
+        elif should_send_default_pii():
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 

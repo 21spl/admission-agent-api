@@ -4,24 +4,23 @@ import json
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from ..utils import parse_env_vars
+from ..utils import InitState, parse_env_vars
 from .env import EnvSettingsSource
 
 if TYPE_CHECKING:
+    from types_boto3_secretsmanager.client import SecretsManagerClient
+
     from pydantic_settings.main import BaseSettings
 
 
 boto3_client = None
-SecretsManagerClient = None
 
 
 def import_aws_secrets_manager() -> None:
     global boto3_client
-    global SecretsManagerClient
 
     try:
         from boto3 import client as boto3_client
-        from types_boto3_secretsmanager.client import SecretsManagerClient
     except ImportError as e:  # pragma: no cover
         raise ImportError(
             'AWS Secrets Manager dependencies are not installed, run `pip install pydantic-settings[aws-secrets-manager]`'
@@ -30,7 +29,7 @@ def import_aws_secrets_manager() -> None:
 
 class AWSSecretsManagerSettingsSource(EnvSettingsSource):
     _secret_id: str
-    _secretsmanager_client: SecretsManagerClient  # type: ignore
+    _secretsmanager_client: SecretsManagerClient
 
     def __init__(
         self,
@@ -44,6 +43,7 @@ class AWSSecretsManagerSettingsSource(EnvSettingsSource):
         env_parse_none_str: str | None = None,
         env_parse_enums: bool | None = None,
         version_id: str | None = None,
+        _init_state: InitState | None = None,
     ) -> None:
         import_aws_secrets_manager()
         self._secretsmanager_client = boto3_client('secretsmanager', region_name=region_name, endpoint_url=endpoint_url)  # type: ignore
@@ -57,6 +57,7 @@ class AWSSecretsManagerSettingsSource(EnvSettingsSource):
             env_ignore_empty=False,
             env_parse_none_str=env_parse_none_str,
             env_parse_enums=env_parse_enums,
+            _init_state=_init_state,
         )
 
     def _load_env_vars(self) -> Mapping[str, str | None]:
@@ -65,7 +66,7 @@ class AWSSecretsManagerSettingsSource(EnvSettingsSource):
         if self._version_id:
             request['VersionId'] = self._version_id
 
-        response = self._secretsmanager_client.get_secret_value(**request)  # type: ignore
+        response = self._secretsmanager_client.get_secret_value(**request)
 
         return parse_env_vars(
             json.loads(response['SecretString']),

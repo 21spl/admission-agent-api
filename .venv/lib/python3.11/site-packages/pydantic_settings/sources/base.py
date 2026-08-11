@@ -19,8 +19,17 @@ from typing_inspection.introspection import is_union_origin
 
 from ..exceptions import SettingsError
 from ..utils import _lenient_issubclass
-from .types import EnvNoneType, EnvPrefixTarget, ForceDecode, NoDecode, PathType, PydanticModel, _CliSubCommand
+from .types import (
+    ConfigFileSourceType,
+    EnvNoneType,
+    EnvPrefixTarget,
+    ForceDecode,
+    NoDecode,
+    PydanticModel,
+    _CliSubCommand,
+)
 from .utils import (
+    InitState,
     _annotation_is_complex,
     _get_alias_names,
     _get_field_metadata,
@@ -28,10 +37,13 @@ from .utils import (
     _resolve_type_alias,
     _strip_annotated,
     _union_is_complex,
+    _warn_if_field_info_incomplete,
 )
 
 if TYPE_CHECKING:
     from pydantic_settings.main import BaseSettings
+
+    from .types import Traversable
 
 
 def get_subcommand(
@@ -74,6 +86,8 @@ def get_subcommand(
             if getattr(model, field_name) is not None:
                 return getattr(model, field_name)
             subcommands.append(field_name)
+        # TODO: we could warn if no sub command was found and one of `field_info`s
+        # isn't complete.
 
     if is_required:
         error_message = (
@@ -94,7 +108,8 @@ class PydanticBaseSettingsSource(ABC):
     Abstract base class for settings sources, every settings source classes should inherit from it.
     """
 
-    def __init__(self, settings_cls: type[BaseSettings]):
+    def __init__(self, settings_cls: type[BaseSettings], _init_state: InitState | None = None):
+        self._init_state: InitState = {} if _init_state is None else _init_state
         self.settings_cls = settings_cls
         self.config = settings_cls.model_config
         self._current_state: dict[str, Any] = {}
@@ -142,7 +157,6 @@ class PydanticBaseSettingsSource(ABC):
         Returns:
             A tuple that contains the value, key and a flag to determine whether value is complex.
         """
-        pass
 
     def field_is_complex(self, field: FieldInfo) -> bool:
         """
@@ -154,7 +168,7 @@ class PydanticBaseSettingsSource(ABC):
         Returns:
             Whether the field is complex.
         """
-        return _annotation_is_complex(field.annotation, field.metadata)
+        return _annotation_is_complex(field.annotation, field.metadata, self._init_state)
 
     def prepare_field_value(self, field_name: str, field: FieldInfo, value: Any, value_is_complex: bool) -> Any:
         """
@@ -199,17 +213,14 @@ class PydanticBaseSettingsSource(ABC):
 
 
 class ConfigFileSourceMixin(ABC):
-    def _read_files(self, files: PathType | None, deep_merge: bool = False) -> dict[str, Any]:
+    def _read_files(self, files: ConfigFileSourceType | None, deep_merge: bool = False) -> dict[str, Any]:
         if files is None:
             return {}
         if not isinstance(files, Sequence) or isinstance(files, str):
             files = [files]
         vars: dict[str, Any] = {}
         for file in files:
-            if isinstance(file, str):
-                file_path = Path(file)
-            else:
-                file_path = file
+            file_path: Path | Traversable = Path(file) if isinstance(file, str) else file
             if isinstance(file_path, Path):
                 file_path = file_path.expanduser()
 
@@ -224,8 +235,28 @@ class ConfigFileSourceMixin(ABC):
         return vars
 
     @abstractmethod
-    def _read_file(self, path: Path) -> dict[str, Any]:
+    def _read_file(self, path: Path | Traversable) -> dict[str, Any]:
         pass
+
+
+def _unwrap_optional_annotation(annotation: Any) -> Any:
+    """Return the inner type of an ``Optional[T]`` annotation, otherwise the annotation unchanged."""
+    if is_union_origin(get_origin(annotation)):
+        args = get_args(annotation)
+        if len(args) == 2 and type(None) in args:
+            for arg in args:
+                if arg is not type(None):
+                    return arg
+    return annotation
+
+
+def _has_discriminator(field_info: FieldInfo) -> bool:
+    """Check if a field uses a discriminated union (via Annotated or Field(discriminator=...))."""
+    if field_info.discriminator is not None:
+        return True
+    from pydantic import Discriminator
+
+    return any(isinstance(m, Discriminator) for m in field_info.metadata)
 
 
 class DefaultSettingsSource(PydanticBaseSettingsSource):
@@ -238,8 +269,13 @@ class DefaultSettingsSource(PydanticBaseSettingsSource):
             Defaults to `False`.
     """
 
-    def __init__(self, settings_cls: type[BaseSettings], nested_model_default_partial_update: bool | None = None):
-        super().__init__(settings_cls)
+    def __init__(
+        self,
+        settings_cls: type[BaseSettings],
+        nested_model_default_partial_update: bool | None = None,
+        _init_state: InitState | None = None,
+    ):
+        super().__init__(settings_cls, _init_state)
         self.defaults: dict[str, Any] = {}
         self.nested_model_default_partial_update = (
             nested_model_default_partial_update
@@ -248,6 +284,9 @@ class DefaultSettingsSource(PydanticBaseSettingsSource):
         )
         if self.nested_model_default_partial_update:
             for field_name, field_info in settings_cls.model_fields.items():
+                _warn_if_field_info_incomplete(field_info, field_name, self._init_state)
+                if _has_discriminator(field_info):
+                    continue
                 alias_names, *_ = _get_alias_names(field_name, field_info)
                 preferred_alias = alias_names[0]
                 if is_dataclass(type(field_info.default)):
@@ -278,37 +317,60 @@ class InitSettingsSource(PydanticBaseSettingsSource):
         settings_cls: type[BaseSettings],
         init_kwargs: dict[str, Any],
         nested_model_default_partial_update: bool | None = None,
+        _init_state: InitState | None = None,
     ):
+        super().__init__(settings_cls, _init_state)
+        case_sensitive = self.config.get('case_sensitive', False)
+        include_name = self.config.get('populate_by_name', False) or self.config.get('validate_by_name', False)
+
+        def normalize(name: str) -> str:
+            # When case_sensitive is False, matching is done on lower-cased names.
+            return name if case_sensitive else name.lower()
+
         self.init_kwargs = {}
         init_kwarg_names = set(init_kwargs.keys())
+        # Map each normalized name to all provided keys sharing it, so field aliases can
+        # be matched without losing the original key used to look up the value. A 1-to-many
+        # mapping is required because case_sensitive=False can collapse distinct keys
+        # (e.g. ``TeSt`` and ``TEST``) onto the same normalized name.
+        normalized_provided: dict[str, list[str]] = {}
+        for key in init_kwargs:
+            normalized_provided.setdefault(normalize(key), []).append(key)
         for field_name, field_info in settings_cls.model_fields.items():
-            alias_names, *_ = _get_alias_names(field_name, field_info)
+            _warn_if_field_info_incomplete(field_info, field_name, self._init_state)
+            # Canonical (case-preserving) alias names determine the output key, so the value
+            # still matches pydantic's validation aliases, which are always case-sensitive.
+            canonical_alias_names, *_ = _get_alias_names(field_name, field_info)
+            # Match alias names respect case_sensitive when matching against provided keys.
+            match_alias_names, *_ = _get_alias_names(field_name, field_info, case_sensitive=case_sensitive)
             # When populate_by_name is True, allow using the field name as an input key,
             # but normalize to the preferred alias to keep keys consistent across sources.
-            matchable_names = set(alias_names)
-            include_name = settings_cls.model_config.get('populate_by_name', False) or settings_cls.model_config.get(
-                'validate_by_name', False
-            )
+            matchable_names = list(match_alias_names)
             if include_name:
-                matchable_names.add(field_name)
-            init_kwarg_name = init_kwarg_names & matchable_names
-            if init_kwarg_name:
-                preferred_alias = alias_names[0] if alias_names else field_name
-                # Choose provided key deterministically: prefer the first alias in alias_names order;
-                # fall back to field_name if allowed and provided.
-                provided_key = next((alias for alias in alias_names if alias in init_kwarg_names), None)
-                if provided_key is None and include_name and field_name in init_kwarg_names:
-                    provided_key = field_name
-                # provided_key should not be None here because init_kwarg_name is non-empty
-                assert provided_key is not None
-                init_kwarg_names -= init_kwarg_name
-                self.init_kwargs[preferred_alias] = init_kwargs[provided_key]
+                name = normalize(field_name)
+                if name not in matchable_names:
+                    matchable_names.append(name)
+            # All provided keys matching this field, in matchable_names preference order
+            # (aliases first, then the field name). Only keys not yet consumed by an
+            # earlier field are considered.
+            matched_keys = [
+                original
+                for name in matchable_names
+                if name in normalized_provided
+                for original in normalized_provided[name]
+                if original in init_kwarg_names
+            ]
+            if matched_keys:
+                preferred_alias = canonical_alias_names[0] if canonical_alias_names else field_name
+                # Prefer the first match in preference order; drop the remaining matches
+                # so they are not re-added as extras.
+                init_kwarg_names.difference_update(matched_keys)
+                self.init_kwargs[preferred_alias] = init_kwargs[matched_keys[0]]
         # Include any remaining init kwargs (e.g., extras) unchanged
         # Note: If populate_by_name is True and the provided key is the field name, but
         # no alias exists, we keep it as-is so it can be processed as extra if allowed.
         self.init_kwargs.update({key: val for key, val in init_kwargs.items() if key in init_kwarg_names})
 
-        super().__init__(settings_cls)
         self.nested_model_default_partial_update = (
             nested_model_default_partial_update
             if nested_model_default_partial_update is not None
@@ -340,8 +402,9 @@ class PydanticBaseEnvSettingsSource(PydanticBaseSettingsSource):
         env_ignore_empty: bool | None = None,
         env_parse_none_str: str | None = None,
         env_parse_enums: bool | None = None,
+        _init_state: InitState | None = None,
     ) -> None:
-        super().__init__(settings_cls)
+        super().__init__(settings_cls, _init_state)
         self.case_sensitive = case_sensitive if case_sensitive is not None else self.config.get('case_sensitive', False)
         self.env_prefix = env_prefix if env_prefix is not None else self.config.get('env_prefix', '')
         self.env_prefix_target = (
@@ -375,6 +438,7 @@ class PydanticBaseEnvSettingsSource(PydanticBaseSettingsSource):
         Returns:
             list[tuple[str, str, bool]]: List of tuples, each tuple contains field_key, env_name, and value_is_complex.
         """
+        _warn_if_field_info_incomplete(field, field_name, self._init_state)
         field_info: list[tuple[str, str, bool]] = []
         if isinstance(field.validation_alias, (AliasChoices, AliasPath)):
             v_alias: str | list[str | int] | list[list[str | int]] | None = field.validation_alias.convert_to_aliases()
@@ -386,16 +450,14 @@ class PydanticBaseEnvSettingsSource(PydanticBaseSettingsSource):
             if isinstance(v_alias, list):  # AliasChoices, AliasPath
                 for alias in v_alias:
                     if isinstance(alias, str):  # AliasPath
-                        field_info.append(
-                            (alias, self._apply_case_sensitive(env_prefix + alias), True if len(alias) > 1 else False)
-                        )
+                        field_info.append((alias, self._apply_case_sensitive(env_prefix + alias), len(alias) > 1))
                     elif isinstance(alias, list):  # AliasChoices
                         first_arg = cast(str, alias[0])  # first item of an AliasChoices must be a str
                         field_info.append(
                             (
                                 first_arg,
                                 self._apply_case_sensitive(env_prefix + first_arg),
-                                True if len(alias) > 1 else False,
+                                len(alias) > 1,
                             )
                         )
             else:  # string validation alias
@@ -404,7 +466,9 @@ class PydanticBaseEnvSettingsSource(PydanticBaseSettingsSource):
         if not v_alias or self.config.get('populate_by_name', False) or self.config.get('validate_by_name', False):
             annotation = _strip_annotated(_resolve_type_alias(field.annotation))
             env_prefix = self.env_prefix if self.env_prefix_target in ('variable', 'all') else ''
-            if is_union_origin(get_origin(annotation)) and _union_is_complex(annotation, field.metadata):
+            if is_union_origin(get_origin(annotation)) and _union_is_complex(
+                annotation, field.metadata, self._init_state
+            ):
                 field_info.append((field_name, self._apply_case_sensitive(env_prefix + field_name), True))
             else:
                 field_info.append((field_name, self._apply_case_sensitive(env_prefix + field_name), False))
@@ -447,16 +511,7 @@ class PydanticBaseEnvSettingsSource(PydanticBaseSettingsSource):
         for name, value in field_values.items():
             sub_model_field: FieldInfo | None = None
 
-            annotation = field.annotation
-
-            # If field is Optional, we need to find the actual type
-            if is_union_origin(get_origin(field.annotation)):
-                args = get_args(annotation)
-                if len(args) == 2 and type(None) in args:
-                    for arg in args:
-                        if arg is not None:
-                            annotation = arg
-                            break
+            annotation = _unwrap_optional_annotation(field.annotation)
 
             # This is here to make mypy happy
             # Item "None" of "Optional[Type[Any]]" has no attribute "model_fields"
@@ -469,6 +524,7 @@ class PydanticBaseEnvSettingsSource(PydanticBaseSettingsSource):
             # Find field in sub model by looking in fields case insensitively
             field_key: str | None = None
             for sub_model_field_name, sub_model_field in model_fields.items():
+                _warn_if_field_info_incomplete(sub_model_field, sub_model_field_name, self._init_state)
                 aliases, _ = _get_alias_names(sub_model_field_name, sub_model_field)
                 _search = (alias for alias in aliases if alias.lower() == name.lower())
                 if field_key := next(_search, None):
@@ -480,7 +536,7 @@ class PydanticBaseEnvSettingsSource(PydanticBaseSettingsSource):
 
             if (
                 sub_model_field is not None
-                and _lenient_issubclass(sub_model_field.annotation, BaseModel)
+                and _lenient_issubclass(_unwrap_optional_annotation(sub_model_field.annotation), BaseModel)
                 and isinstance(value, dict)
             ):
                 values[field_key] = self._replace_field_names_case_insensitively(sub_model_field, value)
@@ -540,6 +596,7 @@ class PydanticBaseEnvSettingsSource(PydanticBaseSettingsSource):
         data: dict[str, Any] = {}
 
         for field_name, field in self.settings_cls.model_fields.items():
+            _warn_if_field_info_incomplete(field, field_name, self._init_state)
             try:
                 field_value, field_key, value_is_complex = self._get_resolved_field_value(field, field_name)
             except Exception as e:

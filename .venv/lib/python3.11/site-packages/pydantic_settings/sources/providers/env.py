@@ -10,7 +10,7 @@ from typing import (
     get_origin,
 )
 
-from pydantic import Json, TypeAdapter, ValidationError
+from pydantic import AliasChoices, AliasPath, Json, TypeAdapter, ValidationError
 from pydantic._internal._utils import deep_update, is_model_class
 from pydantic.dataclasses import is_pydantic_dataclass
 from pydantic.fields import FieldInfo
@@ -20,6 +20,7 @@ from ...utils import _lenient_issubclass
 from ..base import PydanticBaseEnvSettingsSource
 from ..types import EnvNoneType, EnvPrefixTarget
 from ..utils import (
+    InitState,
     _annotation_contains_types,
     _annotation_enum_name_to_val,
     _annotation_is_complex,
@@ -32,6 +33,15 @@ from ..utils import (
 
 if TYPE_CHECKING:
     from pydantic_settings.main import BaseSettings
+
+
+def _environ_is_case_insensitive() -> bool:
+    """Whether ``os.environ`` is the OS-backed, case-insensitive mapping (i.e. on Windows).
+
+    When ``os.environ`` has been replaced (e.g. patched to a plain ``dict`` in tests), the
+    requested case sensitivity is honored as-is.
+    """
+    return os.name == 'nt' and isinstance(os.environ, os._Environ)
 
 
 class EnvSettingsSource(PydanticBaseEnvSettingsSource):
@@ -50,6 +60,7 @@ class EnvSettingsSource(PydanticBaseEnvSettingsSource):
         env_ignore_empty: bool | None = None,
         env_parse_none_str: str | None = None,
         env_parse_enums: bool | None = None,
+        _init_state: InitState | None = None,
     ) -> None:
         super().__init__(
             settings_cls,
@@ -59,6 +70,7 @@ class EnvSettingsSource(PydanticBaseEnvSettingsSource):
             env_ignore_empty,
             env_parse_none_str,
             env_parse_enums,
+            _init_state,
         )
         self.env_nested_delimiter = (
             env_nested_delimiter if env_nested_delimiter is not None else self.config.get('env_nested_delimiter')
@@ -72,6 +84,13 @@ class EnvSettingsSource(PydanticBaseEnvSettingsSource):
         self.env_vars = self._load_env_vars()
 
     def _load_env_vars(self) -> Mapping[str, str | None]:
+        # On Windows, ``os.environ`` is case-insensitive: variable names are normalized to
+        # upper-case and looked up regardless of case. Matching environment variables
+        # case-sensitively is therefore impossible, so we fall back to case-insensitive
+        # matching to avoid spurious "field required" errors (see #295). ``.env`` files do
+        # preserve case and are handled by ``DotEnvSettingsSource``, which overrides this method.
+        if self.case_sensitive and _environ_is_case_insensitive():
+            self.case_sensitive = False
         return parse_env_vars(os.environ, self.case_sensitive, self.env_ignore_empty, self.env_parse_none_str)
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
@@ -129,9 +148,9 @@ class EnvSettingsSource(PydanticBaseEnvSettingsSource):
                 # field is complex and there's a value, decode that as JSON, then add explode_env_vars
                 try:
                     value = self.decode_complex_value(field_name, field, value)
-                except ValueError as e:
+                except ValueError:
                     if not allow_parse_failure:
-                        raise e
+                        raise
 
                 if isinstance(value, dict):
                     return deep_update(value, self.explode_env_vars(field_name, field, self.env_vars))
@@ -141,13 +160,45 @@ class EnvSettingsSource(PydanticBaseEnvSettingsSource):
             # simplest case, field is not complex, we only need to add the value if it was found
             return self._coerce_env_val_strict(field, value)
 
+    def _matches_alias_path_head(self, field: FieldInfo | Any | None, key: str) -> bool:
+        """
+        Whether ``key`` matches the first element of a multi-part ``AliasPath`` on ``field``.
+
+        When a nested field is aliased via e.g. ``AliasPath('path', 0)``, the env value found
+        under ``path`` is a container that must be JSON-decoded before pydantic can navigate
+        into it (see #670). This mirrors the complexity that ``_extract_field_info`` already
+        reports for top-level ``AliasPath`` fields.
+
+        Args:
+            field: The field (or raw type) matched for ``key``.
+            key: The (case-normalized) env name segment matched for the field.
+
+        Returns:
+            Whether ``key`` is the head of a multi-element ``AliasPath``.
+        """
+        if not isinstance(field, FieldInfo):
+            return False
+        v_alias = field.validation_alias
+        paths: list[tuple[str | int, ...]] = []
+        if isinstance(v_alias, AliasPath):
+            paths.append(tuple(v_alias.path))
+        elif isinstance(v_alias, AliasChoices):
+            paths.extend(tuple(choice.path) for choice in v_alias.choices if isinstance(choice, AliasPath))
+        for path in paths:
+            head = path[0]
+            if len(path) > 1 and isinstance(head, str) and self._apply_case_sensitive(head) == key:
+                return True
+        return False
+
     def _field_is_complex(self, field: FieldInfo) -> tuple[bool, bool]:
         """
         Find out if a field is complex, and if so whether JSON errors should be ignored
         """
         if self.field_is_complex(field):
             allow_parse_failure = False
-        elif is_union_origin(get_origin(field.annotation)) and _union_is_complex(field.annotation, field.metadata):
+        elif is_union_origin(get_origin(field.annotation)) and _union_is_complex(
+            field.annotation, field.metadata, self._init_state
+        ):
             allow_parse_failure = True
         else:
             return False, False
@@ -259,12 +310,16 @@ class EnvSettingsSource(PydanticBaseEnvSettingsSource):
             if (target_field or is_dict) and env_val:
                 if isinstance(target_field, FieldInfo):
                     is_complex, allow_json_failure = self._field_is_complex(target_field)
+                    if not is_complex and self._matches_alias_path_head(target_field, last_key):
+                        # The env value sits under an AliasPath head (e.g. AliasPath('path', 0));
+                        # decode it so pydantic can navigate into the container (see #670).
+                        is_complex, allow_json_failure = True, True
                     if self.env_parse_enums:
                         enum_val = _annotation_enum_name_to_val(target_field.annotation, env_val)
                         env_val = env_val if enum_val is None else enum_val
                 elif target_field:
                     # target_field is a raw type (e.g. from dict value type annotation)
-                    is_complex = _annotation_is_complex(target_field, [])
+                    is_complex = _annotation_is_complex(target_field, [], self._init_state)
                     allow_json_failure = True
                 else:
                     # nested field type is dict
@@ -273,12 +328,13 @@ class EnvSettingsSource(PydanticBaseEnvSettingsSource):
                     try:
                         field_info = target_field if isinstance(target_field, FieldInfo) else None
                         env_val = self.decode_complex_value(last_key, field_info, env_val)  # type: ignore
-                    except ValueError as e:
+                    except ValueError:
                         if not allow_json_failure:
-                            raise e
-            if isinstance(env_var, dict):
-                if last_key not in env_var or not isinstance(env_val, EnvNoneType) or env_var[last_key] == {}:
-                    env_var[last_key] = self._coerce_env_val_strict(target_field, env_val)
+                            raise
+            if isinstance(env_var, dict) and (
+                last_key not in env_var or not isinstance(env_val, EnvNoneType) or env_var[last_key] == {}
+            ):
+                env_var[last_key] = self._coerce_env_val_strict(target_field, env_val)
         return result
 
     def _coerce_env_val_strict(self, field: FieldInfo | None, value: Any) -> Any:
@@ -307,14 +363,11 @@ class EnvSettingsSource(PydanticBaseEnvSettingsSource):
                         return TypeAdapter(field.annotation).validate_python(value)
                     except ValidationError:
                         # Try JSON decoding as fallback (e.g. 'true' -> True for StrictBool)
-                        try:
-                            decoded = json.loads(value)
-                        except (ValueError, json.JSONDecodeError):
-                            raise
+                        decoded = json.loads(value)
                         if not isinstance(decoded, str):
                             return TypeAdapter(field.annotation).validate_python(decoded)
                         raise
-        except ValidationError:
+        except (ValidationError, json.JSONDecodeError):
             # Allow validation error to be raised at time of instantiation
             pass
         return value

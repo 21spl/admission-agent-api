@@ -2,6 +2,7 @@ from __future__ import annotations as _annotations
 
 import asyncio
 import inspect
+import logging
 import re
 import threading
 import warnings
@@ -21,6 +22,7 @@ from .exceptions import SettingsError
 from .sources import (
     ENV_FILE_SENTINEL,
     CliSettingsSource,
+    ConfigFileSourceType,
     DefaultSettingsSource,
     DotenvFiltering,
     DotEnvSettingsSource,
@@ -38,7 +40,8 @@ from .sources import (
     YamlConfigSettingsSource,
     get_subcommand,
 )
-from .sources.utils import _get_alias_names
+from .sources.utils import InitState, _get_alias_names, _warn_if_field_info_incomplete
+from .utils import _settings_debug_enabled, logger
 
 T = TypeVar('T')
 
@@ -63,6 +66,7 @@ class SettingsConfigDict(ConfigDict, total=False):
     cli_avoid_json: bool
     cli_enforce_required: bool
     cli_use_class_docs_for_groups: bool
+    cli_show_env_vars: bool
     cli_exit_on_error: bool
     cli_prefix: str
     cli_flag_prefix_char: str
@@ -71,9 +75,9 @@ class SettingsConfigDict(ConfigDict, total=False):
     cli_kebab_case: bool | Literal['all', 'no_enums'] | None
     cli_shortcuts: Mapping[str, str | list[str]] | None
     secrets_dir: PathType | None
-    json_file: PathType | None
+    json_file: ConfigFileSourceType | None
     json_file_encoding: str | None
-    yaml_file: PathType | None
+    yaml_file: ConfigFileSourceType | None
     yaml_file_encoding: str | None
     yaml_config_section: str | None
     """
@@ -104,7 +108,15 @@ class SettingsConfigDict(ConfigDict, total=False):
     To use the root table, exclude this config setting or provide an empty tuple.
     """
 
-    toml_file: PathType | None
+    toml_file: ConfigFileSourceType | None
+
+    toml_table_header: tuple[str, ...]
+    """
+    Header of the TOML table in a TOML file to use when filling variables.
+    Similar to `pyproject_toml_table_header`, but for generic TOML file handling.
+
+    Default is to use the root table, i.e. no table header.
+    """
     enable_decoding: bool
 
 
@@ -156,6 +168,7 @@ class BaseSettings(BaseModel):
         _cli_enforce_required: Enforce required fields at the CLI. Defaults to `False`.
         _cli_use_class_docs_for_groups: Use class docstrings in CLI group help text instead of field descriptions.
             Defaults to `False`.
+        _cli_show_env_vars: Show resolved environment variable names in CLI help text. Defaults to `False`.
         _cli_exit_on_error: Determines whether or not the internal parser exits with error info when an error occurs.
             Defaults to `True`.
         _cli_prefix: The root parser command line arguments prefix. Defaults to "".
@@ -198,6 +211,7 @@ class BaseSettings(BaseModel):
         _cli_avoid_json: bool | None = None,
         _cli_enforce_required: bool | None = None,
         _cli_use_class_docs_for_groups: bool | None = None,
+        _cli_show_env_vars: bool | None = None,
         _cli_exit_on_error: bool | None = None,
         _cli_prefix: str | None = None,
         _cli_flag_prefix_char: str | None = None,
@@ -232,6 +246,7 @@ class BaseSettings(BaseModel):
                 _cli_avoid_json=_cli_avoid_json,
                 _cli_enforce_required=_cli_enforce_required,
                 _cli_use_class_docs_for_groups=_cli_use_class_docs_for_groups,
+                _cli_show_env_vars=_cli_show_env_vars,
                 _cli_exit_on_error=_cli_exit_on_error,
                 _cli_prefix=_cli_prefix,
                 _cli_flag_prefix_char=_cli_flag_prefix_char,
@@ -292,6 +307,7 @@ class BaseSettings(BaseModel):
         _cli_avoid_json: bool | None = None,
         _cli_enforce_required: bool | None = None,
         _cli_use_class_docs_for_groups: bool | None = None,
+        _cli_show_env_vars: bool | None = None,
         _cli_exit_on_error: bool | None = None,
         _cli_prefix: str | None = None,
         _cli_flag_prefix_char: str | None = None,
@@ -352,6 +368,9 @@ class BaseSettings(BaseModel):
             if _cli_use_class_docs_for_groups is not None
             else cls.model_config.get('cli_use_class_docs_for_groups')
         )
+        cli_show_env_vars = (
+            _cli_show_env_vars if _cli_show_env_vars is not None else cls.model_config.get('cli_show_env_vars')
+        )
         cli_exit_on_error = (
             _cli_exit_on_error if _cli_exit_on_error is not None else cls.model_config.get('cli_exit_on_error')
         )
@@ -372,14 +391,17 @@ class BaseSettings(BaseModel):
 
         secrets_dir = _secrets_dir if _secrets_dir is not None else cls.model_config.get('secrets_dir')
 
-        # Configure built-in sources
+        # Configure built-in sources, sharing the same init state so that incomplete
+        # fields are only warned about once per settings resolution.
+        init_state: InitState = {'field_info_ids': set()}
         default_settings = DefaultSettingsSource(
-            cls, nested_model_default_partial_update=nested_model_default_partial_update
+            cls, nested_model_default_partial_update=nested_model_default_partial_update, _init_state=init_state
         )
         init_settings = InitSettingsSource(
             cls,
             init_kwargs=_init_kwargs if _init_kwargs is not None else {},
             nested_model_default_partial_update=nested_model_default_partial_update,
+            _init_state=default_settings._init_state,
         )
         env_settings = EnvSettingsSource(
             cls,
@@ -391,6 +413,7 @@ class BaseSettings(BaseModel):
             env_ignore_empty=env_ignore_empty,
             env_parse_none_str=env_parse_none_str,
             env_parse_enums=env_parse_enums,
+            _init_state=init_settings._init_state,
         )
         dotenv_settings = DotEnvSettingsSource(
             cls,
@@ -404,6 +427,7 @@ class BaseSettings(BaseModel):
             env_ignore_empty=env_ignore_empty,
             env_parse_none_str=env_parse_none_str,
             env_parse_enums=env_parse_enums,
+            _init_state=env_settings._init_state,
         )
 
         file_secret_settings = SecretsSettingsSource(
@@ -412,6 +436,7 @@ class BaseSettings(BaseModel):
             case_sensitive=case_sensitive,
             env_prefix=env_prefix,
             env_prefix_target=env_prefix_target,
+            _init_state=dotenv_settings._init_state,
         )
         # Provide a hook to set built-in sources priority and add / remove sources
         sources = cls.settings_customise_sources(
@@ -428,6 +453,7 @@ class BaseSettings(BaseModel):
             elif cli_parse_args is not None:
                 cli_settings = CliSettingsSource[Any](
                     cls,
+                    _init_state=file_secret_settings._init_state,
                     cli_prog_name=cli_prog_name,
                     cli_parse_args=cli_parse_args,
                     cli_parse_none_str=cli_parse_none_str,
@@ -435,6 +461,7 @@ class BaseSettings(BaseModel):
                     cli_avoid_json=cli_avoid_json,
                     cli_enforce_required=cli_enforce_required,
                     cli_use_class_docs_for_groups=cli_use_class_docs_for_groups,
+                    cli_show_env_vars=cli_show_env_vars,
                     cli_exit_on_error=cli_exit_on_error,
                     cli_prefix=cli_prefix,
                     cli_flag_prefix_char=cli_flag_prefix_char,
@@ -443,11 +470,12 @@ class BaseSettings(BaseModel):
                     cli_kebab_case=cli_kebab_case,
                     cli_shortcuts=cli_shortcuts,
                     case_sensitive=case_sensitive,
+                    _env_settings_source=env_settings,
                 )
                 sources = (cli_settings,) + sources
         # We ensure that if command line arguments haven't been parsed yet, we do so.
         elif cli_parse_args not in (None, False) and not custom_cli_sources[0].env_vars:
-            custom_cli_sources[0](args=cli_parse_args)  # type: ignore
+            custom_cli_sources[0](args=cli_parse_args)
 
         cls._settings_warn_unused_config_keys(sources, cls.model_config)
 
@@ -475,9 +503,16 @@ class BaseSettings(BaseModel):
                 states[source_name] = source_state
                 state = deep_update(source_state, state)
 
-            # Strip any default values not explicity set before returning final state
+            # Strip any default values not explicitly set before returning final state
             state = {key: val for key, val in state.items() if key not in defaults or defaults[key] != val}
-            cls._settings_restore_init_kwarg_names(cls, init_kwargs, state)
+
+            if _settings_debug_enabled() and logger.isEnabledFor(logging.DEBUG):
+                cls._settings_log_debug(states)
+            # The last source is the `DefaultSettingsSource` instance created in `_settings_init_sources()`,
+            # holding the init state shared by all built-in sources:
+            last_source = sources[-1]
+            init_state = last_source._init_state if isinstance(last_source, PydanticBaseSettingsSource) else InitState()
+            cls._settings_restore_init_kwarg_names(cls, init_kwargs, state, init_state)
 
             return state
         else:
@@ -485,9 +520,27 @@ class BaseSettings(BaseModel):
             # to an informative error and much better than a confusing error
             return {}
 
+    @classmethod
+    def _settings_log_debug(cls, states: dict[str, dict[str, Any]]) -> None:
+        """Log the data collected by each settings source in priority order.
+
+        Enabled by setting the ``PYDANTIC_SETTINGS_DEBUG`` environment variable to a truthy value.
+        This is emitted at ``DEBUG`` level on the ``pydantic_settings`` logger.
+
+        Warning: the output may contain sensitive values loaded from the environment, dotenv
+        files, or secret files. Only enable it in a trusted debugging context.
+        """
+        lines = [f'Resolving settings for {cls.__name__!r} (sources in priority order, highest first):']
+        for name, source_state in states.items():
+            lines.append(f'  {name}: {source_state!r}')
+        logger.debug('\n'.join(lines))
+
     @staticmethod
     def _settings_restore_init_kwarg_names(
-        settings_cls: type[BaseSettings], init_kwargs: dict[str, Any], state: dict[str, Any]
+        settings_cls: type[BaseSettings],
+        init_kwargs: dict[str, Any],
+        state: dict[str, Any],
+        init_state: InitState,
     ) -> None:
         """
         Restore the init_kwarg key names to the final merged state dictionary.
@@ -499,6 +552,7 @@ class BaseSettings(BaseModel):
             state_kwarg_names = set(state.keys())
             init_kwarg_names = set(init_kwargs.keys())
             for field_name, field_info in settings_cls.model_fields.items():
+                _warn_if_field_info_incomplete(field_info, field_name, init_state)
                 alias_names, *_ = _get_alias_names(field_name, field_info)
                 matchable_names = set(alias_names)
                 include_name = settings_cls.model_config.get(
@@ -557,7 +611,7 @@ class BaseSettings(BaseModel):
 
         warn_if_not_used(JsonConfigSettingsSource, ('json_file', 'json_file_encoding'))
         warn_if_not_used(PyprojectTomlConfigSettingsSource, ('pyproject_toml_depth', 'pyproject_toml_table_header'))
-        warn_if_not_used(TomlConfigSettingsSource, ('toml_file',))
+        warn_if_not_used(TomlConfigSettingsSource, ('toml_file', 'toml_table_header'))
         warn_if_not_used(YamlConfigSettingsSource, ('yaml_file', 'yaml_file_encoding', 'yaml_config_section'))
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
@@ -582,6 +636,7 @@ class BaseSettings(BaseModel):
         cli_avoid_json=False,
         cli_enforce_required=False,
         cli_use_class_docs_for_groups=False,
+        cli_show_env_vars=False,
         cli_exit_on_error=True,
         cli_prefix='',
         cli_flag_prefix_char='-',
@@ -681,6 +736,7 @@ class CliApp:
         cli_args: list[str] | Namespace | SimpleNamespace | dict[str, Any] | None = None,
         cli_settings_source: CliSettingsSource[Any] | None = None,
         cli_exit_on_error: bool | None = None,
+        cli_show_env_vars: bool | None = None,
         cli_cmd_method_name: str = 'cli_cmd',
         **model_init_data: Any,
     ) -> T:
@@ -697,6 +753,7 @@ class CliApp:
             cli_exit_on_error: Determines whether this function exits on error. If model is subclass of
                 `BaseSettings`, defaults to BaseSettings `cli_exit_on_error` value. Otherwise, defaults to
                 `True`.
+            cli_show_env_vars: Show resolved environment variable names in CLI help text. Defaults to `False`.
             cli_cmd_method_name: The CLI command method name to run. Defaults to "cli_cmd".
             model_init_data: The model init data.
 
@@ -728,6 +785,7 @@ class CliApp:
             sources, init_kwargs = base_settings_cls._settings_init_sources(
                 _cli_parse_args=cli_parse_args,  # type: ignore[arg-type]
                 _cli_exit_on_error=cli_exit_on_error,
+                _cli_show_env_vars=cli_show_env_vars,
                 _cli_settings_source=cli_settings,
                 _init_kwargs=model_init_data,
             )
@@ -740,13 +798,14 @@ class CliApp:
             sources, init_kwargs = model_cls._settings_init_sources(
                 _cli_parse_args=cli_parse_args,  # type: ignore[arg-type]
                 _cli_exit_on_error=cli_exit_on_error,
+                _cli_show_env_vars=cli_show_env_vars,
                 _cli_settings_source=cli_settings,
                 _init_kwargs=model_init_data,
             )
             command = model_cls(_build_sources=(sources, init_kwargs))
 
         subcommand_dest = ':subcommand'
-        cli_settings_source = [source for source in sources if isinstance(source, CliSettingsSource)][0]
+        cli_settings_source = next(source for source in sources if isinstance(source, CliSettingsSource))
         CliApp._subcommand_stack[id(command)] = (cli_settings_source, cli_settings_source.root_parser, subcommand_dest)
         try:
             data_model = CliApp._run_cli_cmd(command, cli_cmd_method_name, is_required=False)
@@ -756,7 +815,10 @@ class CliApp:
 
     @staticmethod
     def run_subcommand(
-        model: PydanticModel, cli_exit_on_error: bool | None = None, cli_cmd_method_name: str = 'cli_cmd'
+        model: PydanticModel,
+        cli_exit_on_error: bool | None = None,
+        cli_show_env_vars: bool | None = None,
+        cli_cmd_method_name: str = 'cli_cmd',
     ) -> PydanticModel:
         """
         Runs the model subcommand. Running a model subcommand requires the `cli_cmd` method to be defined in
@@ -766,6 +828,7 @@ class CliApp:
             model: The model to run the subcommand from.
             cli_exit_on_error: Determines whether this function exits with error if no subcommand is found.
                 Defaults to model_config `cli_exit_on_error` value if set. Otherwise, defaults to `True`.
+            cli_show_env_vars: Show resolved environment variable names in CLI help text. Defaults to `False`.
             cli_cmd_method_name: The CLI command method name to run. Defaults to "cli_cmd".
 
         Returns:
@@ -779,7 +842,10 @@ class CliApp:
         if id(model) in CliApp._subcommand_stack:
             cli_settings_source, parser, subcommand_dest = CliApp._subcommand_stack[id(model)]
         else:
-            cli_settings_source = CliSettingsSource[Any](CliApp._get_base_settings_cls(type(model)))
+            cli_settings_source = CliSettingsSource[Any](
+                CliApp._get_base_settings_cls(type(model)),
+                cli_show_env_vars=cli_show_env_vars,
+            )
             parser = cli_settings_source.root_parser
             subcommand_dest = ':subcommand'
 
@@ -840,7 +906,7 @@ class CliApp:
                   Example: `--config '{"host": "localhost", "port": 5432}'`
                 - 'env':
                   The dictionary is flattened into multiple CLI flags using
-                  environment-variable-style assignement.
+                  environment-variable-style assignment.
                   Example: `--config host=localhost --config port=5432`
             positionals_first: Controls whether positional arguments should be serialized
                 first compared to optional arguments. Defaults to `False`.

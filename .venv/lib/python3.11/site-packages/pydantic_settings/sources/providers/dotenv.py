@@ -2,6 +2,7 @@
 
 from __future__ import annotations as _annotations
 
+import logging
 import os
 import warnings
 from collections.abc import Mapping
@@ -14,8 +15,10 @@ from pydantic._internal._typing_extra import (  # type: ignore[attr-defined]
 )
 from typing_inspection.introspection import is_union_origin
 
+from ...utils import _settings_debug_enabled, logger
 from ..types import ENV_FILE_SENTINEL, DotenvFiltering, DotenvType, EnvPrefixTarget
 from ..utils import (
+    InitState,
     _annotation_is_complex,
     _union_is_complex,
     parse_env_vars,
@@ -45,6 +48,7 @@ class DotEnvSettingsSource(EnvSettingsSource):
         env_ignore_empty: bool | None = None,
         env_parse_none_str: str | None = None,
         env_parse_enums: bool | None = None,
+        _init_state: InitState | None = None,
     ) -> None:
         self.env_file = env_file if env_file != ENV_FILE_SENTINEL else settings_cls.model_config.get('env_file')
         self.env_file_encoding = (
@@ -63,6 +67,7 @@ class DotEnvSettingsSource(EnvSettingsSource):
             env_ignore_empty,
             env_parse_none_str,
             env_parse_enums,
+            _init_state,
         )
 
     def _load_env_vars(self) -> Mapping[str, str | None]:
@@ -100,11 +105,17 @@ class DotEnvSettingsSource(EnvSettingsSource):
         if isinstance(env_files, (str, os.PathLike)):
             env_files = [env_files]
 
+        debug = _settings_debug_enabled() and logger.isEnabledFor(logging.DEBUG)
+
         dotenv_vars: dict[str, str | None] = {}
         for env_file in env_files:
             env_path = Path(env_file).expanduser()
             if env_path.is_file() or env_path.is_fifo():
+                if debug:
+                    logger.debug('Loading env file: %s', env_path.resolve())
                 dotenv_vars.update(self._read_env_file(env_path))
+            elif debug:
+                logger.debug('Env file not found, skipping: %s', env_path.resolve())
 
         return dotenv_vars
 
@@ -141,13 +152,19 @@ class DotEnvSettingsSource(EnvSettingsSource):
                 for _, field_env_name, _ in self._extract_field_info(field, field_name):
                     if env_name == field_env_name or (
                         (
-                            _annotation_is_complex(field.annotation, field.metadata)
+                            _annotation_is_complex(field.annotation, field.metadata, self._init_state)
                             or (
                                 is_union_origin(get_origin(field.annotation))
-                                and _union_is_complex(field.annotation, field.metadata)
+                                and _union_is_complex(field.annotation, field.metadata, self._init_state)
                             )
                         )
-                        and env_name.startswith(field_env_name)
+                        # A var only belongs to a complex field when it sits at the nested
+                        # delimiter boundary (`db<delim>...`, matching what explode_env_vars
+                        # consumes). A bare name-prefix match (e.g. `dbx_token` vs field `db`)
+                        # must not claim the var, otherwise it is silently dropped instead of
+                        # being kept as an extra.
+                        and self.env_nested_delimiter
+                        and env_name.startswith(f'{field_env_name}{self.env_nested_delimiter}')
                     ):
                         env_used = True
                         break

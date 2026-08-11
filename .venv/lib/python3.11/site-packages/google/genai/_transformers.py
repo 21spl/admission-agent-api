@@ -1393,3 +1393,7 @@ def t_is_vertex_embed_content_model(model: str) -> bool:
       # Open-source MaaS embedding models.
       or 'maas' in model
   )
+
+
+def t_json_schema(origin: Any) -> Any:
+  return origin

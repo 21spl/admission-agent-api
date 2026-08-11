@@ -61,6 +61,7 @@ from ..types import (
     _CliUnknownArgs,
 )
 from ..utils import (
+    InitState,
     _annotation_contains_types,
     _annotation_enum_val_to_name,
     _get_alias_names,
@@ -195,7 +196,7 @@ class _CliArg(BaseModel):
         for type_ in get_args(annotation):
             enum_names += cls.get_enum_names(type_, kebab_case)
         if annotation and _lenient_issubclass(annotation, Enum):
-            enum_names += tuple(cls.get_kebab_case(name, kebab_case == 'all') for name in annotation.__members__.keys())
+            enum_names += tuple(cls.get_kebab_case(name, kebab_case == 'all') for name in annotation.__members__)
         return enum_names
 
     def subcommand_alias(self, sub_model: type[BaseModel]) -> str:
@@ -320,6 +321,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         cli_enforce_required: Enforce required fields at the CLI. Defaults to `False`.
         cli_use_class_docs_for_groups: Use class docstrings in CLI group help text instead of field descriptions.
             Defaults to `False`.
+        cli_show_env_vars: Show resolved environment variable names in CLI help text. Defaults to `False`.
         cli_exit_on_error: Determines whether or not the internal parser exits with error info when an error occurs.
             Defaults to `True`.
         cli_prefix: Prefix for command line arguments added under the root parser. Defaults to "".
@@ -359,6 +361,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         cli_avoid_json: bool | None = None,
         cli_enforce_required: bool | None = None,
         cli_use_class_docs_for_groups: bool | None = None,
+        cli_show_env_vars: bool | None = None,
         cli_exit_on_error: bool | None = None,
         cli_prefix: str | None = None,
         cli_flag_prefix_char: str | None = None,
@@ -375,6 +378,8 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         add_subparsers_method: Callable[..., Any] | None = ArgumentParser.add_subparsers,
         format_help_method: Callable[..., Any] | None = ArgumentParser.format_help,
         formatter_class: Any = RawDescriptionHelpFormatter,
+        _env_settings_source: EnvSettingsSource | None = None,
+        _init_state: InitState | None = None,
     ) -> None:
         self.cli_prog_name = (
             cli_prog_name if cli_prog_name is not None else settings_cls.model_config.get('cli_prog_name', sys.argv[0])
@@ -399,6 +404,11 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
             cli_use_class_docs_for_groups
             if cli_use_class_docs_for_groups is not None
             else settings_cls.model_config.get('cli_use_class_docs_for_groups', False)
+        )
+        self.cli_show_env_vars = (
+            cli_show_env_vars
+            if cli_show_env_vars is not None
+            else settings_cls.model_config.get('cli_show_env_vars', False)
         )
         self.cli_exit_on_error = (
             cli_exit_on_error
@@ -432,6 +442,10 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         self.cli_shortcuts = (
             cli_shortcuts if cli_shortcuts is not None else settings_cls.model_config.get('cli_shortcuts', None)
         )
+        self._env_settings_source: EnvSettingsSource | None = None
+        if self.cli_show_env_vars:
+            self._env_settings_source = _env_settings_source or EnvSettingsSource(settings_cls)
+        self._env_var_names: dict[str, tuple[str, ...]] = {}
 
         case_sensitive = case_sensitive if case_sensitive is not None else True
         if not case_sensitive and root_parser is not None:
@@ -445,6 +459,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
             env_prefix=self.cli_prefix,
             case_sensitive=case_sensitive,
             env_nested_max_split=0,
+            _init_state=_init_state,
         )
 
         root_parser = (
@@ -480,6 +495,11 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                 )
             self._load_env_vars(parsed_args=self._parse_args(self.root_parser, cli_parse_args))
 
+    @property
+    def env_var_names(self) -> Mapping[str, tuple[str, ...]]:
+        """Resolved environment variable names for CLI arguments."""
+        return self._env_var_names.copy()
+
     @overload
     def __call__(self) -> dict[str, Any]: ...
 
@@ -497,7 +517,6 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         Returns:
             CliSettingsSource: The object instance itself.
         """
-        ...
 
     @overload
     def __call__(self, *, parsed_args: Namespace | SimpleNamespace | dict[str, Any]) -> CliSettingsSource[T]:
@@ -514,7 +533,6 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         Returns:
             CliSettingsSource: The object instance itself.
         """
-        ...
 
     def __call__(
         self,
@@ -553,7 +571,6 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         Returns:
             CliSettingsSource: The object instance itself.
         """
-        ...
 
     def _load_env_vars(
         self, *, parsed_args: Namespace | SimpleNamespace | dict[str, list[str] | str] | None = None
@@ -578,7 +595,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         }
         if selected_subcommands:
             last_selected_subcommand = max(selected_subcommands, key=len)
-            if not any(field_name for field_name in parsed_args.keys() if f'{last_selected_subcommand}.' in field_name):
+            if not any(field_name for field_name in parsed_args if f'{last_selected_subcommand}.' in field_name):
                 parsed_args[last_selected_subcommand] = '{}'
         else:
             last_selected_subcommand = ''
@@ -728,14 +745,14 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                         val = self._consume_comma(val, merged_list, is_last_consumed_a_value)
                         is_last_consumed_a_value = False
                     else:
-                        if val.startswith('{') or val.startswith('['):
+                        if val.startswith(('{', '[')):
                             val = self._consume_object_or_array(val, merged_list)
                         else:
                             try:
                                 val = self._consume_string_or_number(val, merged_list, merge_type)
-                            except ValueError as e:
+                            except ValueError:
                                 if merge_type is inferred_type:
-                                    raise e
+                                    raise
                                 merge_type = inferred_type
                                 val = self._consume_string_or_number(val, merged_list, merge_type)
                         is_last_consumed_a_value = True
@@ -826,7 +843,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
             raise SettingsError(f'{cli_flag_name} argument {model.__name__}.{field_name} is not of type bool')
 
     def _sort_arg_fields(self, model: type[BaseModel]) -> list[tuple[str, FieldInfo]]:
-        positional_variadic_arg = []
+        positional_variadic_arg: list[tuple[str, FieldInfo]] = []
         positional_args, subcommand_args, optional_args = [], [], []
         for field_name, field_info in _get_model_fields(model).items():
             if _CliSubCommand in field_info.metadata:
@@ -978,6 +995,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
             alias_prefixes=[],
             model_default=PydanticUndefined,
             model_path=set(),
+            env_prefixes=self._root_env_prefixes(),
         )
 
         # If subcommands registered CliUnknownArgs fields but root does not have
@@ -1003,7 +1021,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                 help='show this help message and exit',
             )
 
-    def _add_parser_args(
+    def _add_parser_args(  # noqa: C901
         self,
         parser: Any,
         model: type[BaseModel],
@@ -1014,10 +1032,13 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         alias_prefixes: list[str],
         model_default: Any,
         is_model_suppressed: bool = False,
-        discriminator_vals: dict[str, set[Any]] = {},
+        discriminator_vals: dict[str, set[Any]] | None = None,
         is_last_discriminator: bool = True,
         model_path: set[type[BaseModel]] | None = None,
+        env_prefixes: tuple[tuple[str, bool], ...] = (),
     ) -> ArgumentParser:
+        if discriminator_vals is None:
+            discriminator_vals = {}
         if model_path is None:
             model_path = set()
         model_path = model_path | {model}
@@ -1091,12 +1112,22 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                         alias_prefixes=[],
                         model_default=PydanticUndefined,
                         model_path=model_path,
+                        env_prefixes=self._nested_env_prefixes(
+                            self._get_field_env_var_names(field_name, field_info, env_prefixes)
+                        ),
                     )
             else:
                 flag_prefix: str = self._cli_flag_prefix
+                env_var_names = self._get_field_env_var_names(field_name, field_info, env_prefixes)
                 arg.kwargs['dest'] = arg.dest
                 arg.kwargs['default'] = CLI_SUPPRESS
-                arg.kwargs['help'] = self._help_format(field_name, field_info, model_default, is_model_suppressed)
+                arg.kwargs['help'] = self._help_format(
+                    field_name,
+                    field_info,
+                    model_default,
+                    is_model_suppressed,
+                    env_var_names,
+                )
                 arg.kwargs['metavar'] = self._metavar_format(field_info.annotation)
                 arg.kwargs['required'] = (
                     self.cli_enforce_required and field_info.is_required() and model_default is PydanticUndefined
@@ -1144,6 +1175,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                         model_default=model_default,
                         is_model_suppressed=is_model_suppressed,
                         model_path=model_path,
+                        env_var_names=env_var_names,
                     )
                 elif _CliUnknownArgs in field_info.metadata:
                     self._cli_unknown_args[arg.kwargs['dest']] = []
@@ -1154,6 +1186,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                     if arg.kwargs.get('action') == 'store_false':
                         flag_prefix += 'no-'
                     arg.args = [f'{flag_prefix[: 1 if len(name) == 1 else None]}{name}' for name in arg_names]
+                    self._add_env_var_names(arg.dest, arg.kwargs['help'], env_var_names)
                     self._add_argument(context, *arg.args, **arg.kwargs)
                     added_args += list(arg_names)
 
@@ -1271,6 +1304,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         model_default: Any,
         is_model_suppressed: bool,
         model_path: set[type[BaseModel]] | None = None,
+        env_var_names: tuple[str, ...] = (),
     ) -> None:
         if issubclass(model, CliMutuallyExclusiveGroup):
             # Argparse has deprecated "calling add_argument_group() or add_mutually_exclusive_group() on a
@@ -1317,17 +1351,18 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
         kwargs['help'] = (
             CLI_SUPPRESS
             if is_model_suppressed or self.cli_avoid_json
-            else f'set {arg_names[0]} from JSON string (default: {{}})'
+            else self._help_format_env_vars(f'set {arg_names[0]} from JSON string (default: {{}})', env_var_names)
         )
+        self._add_env_var_names(kwargs['dest'], kwargs['help'], env_var_names)
         model_group = self._add_group(parser, **model_group_kwargs)
         self._add_argument(model_group, *(f'{flag_prefix}{name}' for name in arg_names), **kwargs)
         discriminator_vals: dict[str, set[Any]] = (
             {f'{arg_prefix}{preferred_alias}.{field_info.discriminator}': set()} if field_info.discriminator else {}
         )
-        for model in sub_models:
+        for sub_model in sub_models:
             self._add_parser_args(
                 parser=parser,
-                model=model,
+                model=sub_model,
                 added_args=added_args,
                 arg_prefix=f'{arg_prefix}{preferred_alias}.',
                 subcommand_prefix=subcommand_prefix,
@@ -1336,8 +1371,9 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                 model_default=model_default,
                 is_model_suppressed=is_model_suppressed,
                 discriminator_vals=discriminator_vals,
-                is_last_discriminator=model is sub_models[-1],
+                is_last_discriminator=sub_model is sub_models[-1],
                 model_path=model_path,
+                env_prefixes=self._nested_env_prefixes(env_var_names),
             )
 
     def _add_parser_alias_paths(
@@ -1368,7 +1404,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                     kwargs['metavar'] = 'dict'
                     self._cli_dict_args[arg_name] = dict
                 args = [f'{self._cli_flag_prefix}{arg_name}']
-                for key, arg in self._parser_map[arg_name].items():
+                for arg in self._parser_map[arg_name].values():
                     arg.args, arg.kwargs = args, kwargs
                 self._add_argument(context, *args, **kwargs)
                 added_args.append(arg_name)
@@ -1411,7 +1447,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
             return self._metavar_format_choices(list(map(str, self._get_modified_args(obj))))
         elif _lenient_issubclass(obj, Enum):
             return self._metavar_format_choices(
-                [_CliArg.get_kebab_case(name, self.cli_kebab_case == 'all') for name in obj.__members__.keys()]
+                [_CliArg.get_kebab_case(name, self.cli_kebab_case == 'all') for name in obj.__members__]
             )
         elif isinstance(obj, _WithArgsTypes):
             return self._metavar_format_choices(
@@ -1434,8 +1470,68 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
     def _metavar_format(self, obj: Any) -> str:
         return self._metavar_format_recurse(obj).replace(', ', ',')
 
+    def _root_env_prefixes(self) -> tuple[tuple[str, bool], ...]:
+        if self._env_settings_source is None:
+            return ()
+        return ((self._env_settings_source.env_prefix, False),)
+
+    def _nested_env_prefixes(self, env_var_names: tuple[str, ...]) -> tuple[tuple[str, bool], ...]:
+        if self._env_settings_source is None or not self._env_settings_source.env_nested_delimiter:
+            return ()
+        return tuple(
+            (f'{env_name}{self._env_settings_source.env_nested_delimiter}', True) for env_name in env_var_names
+        )
+
+    def _display_env_var_name(self, env_name: str) -> str:
+        if self._env_settings_source is not None and not self._env_settings_source.case_sensitive:
+            return env_name.upper()
+        return env_name
+
+    def _get_field_env_var_names(
+        self,
+        field_name: str,
+        field_info: FieldInfo,
+        env_prefixes: tuple[tuple[str, bool], ...],
+    ) -> tuple[str, ...]:
+        if (
+            self._env_settings_source is None
+            or self._is_field_suppressed(field_info)
+            or _CliPositionalArg in field_info.metadata
+            or _CliUnknownArgs in field_info.metadata
+        ):
+            return ()
+
+        env_var_names: list[str] = []
+        env_settings_source = copy.copy(self._env_settings_source)
+        for env_prefix, force_env_prefix in env_prefixes:
+            env_settings_source.env_prefix = env_prefix
+            normalized_env_prefix = env_settings_source._apply_case_sensitive(env_prefix)
+            for _, env_name, _ in env_settings_source._extract_field_info(field_info, field_name):
+                if force_env_prefix and normalized_env_prefix and not env_name.startswith(normalized_env_prefix):
+                    env_name = f'{normalized_env_prefix}{env_name}'
+                display_env_name = self._display_env_var_name(env_name)
+                if display_env_name and display_env_name not in env_var_names:
+                    env_var_names.append(display_env_name)
+
+        return tuple(env_var_names)
+
+    def _help_format_env_vars(self, help_text: str, env_var_names: tuple[str, ...]) -> str:
+        if not env_var_names:
+            return help_text
+        env_help = f'[env: {" | ".join(env_var_names)}]'
+        return f'{help_text} {env_help}' if help_text else env_help
+
+    def _add_env_var_names(self, dest: str, help_text: str, env_var_names: tuple[str, ...]) -> None:
+        if env_var_names and help_text != CLI_SUPPRESS:
+            self._env_var_names[dest] = env_var_names
+
     def _help_format(
-        self, field_name: str, field_info: FieldInfo, model_default: Any, is_model_suppressed: bool
+        self,
+        field_name: str,
+        field_info: FieldInfo,
+        model_default: Any,
+        is_model_suppressed: bool,
+        env_var_names: tuple[str, ...] = (),
     ) -> str:
         _help = field_info.description if field_info.description else ''
         if is_model_suppressed or self._is_field_suppressed(field_info):
@@ -1459,6 +1555,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
 
             if _CliToggleFlag not in field_info.metadata:
                 _help += f' {default}' if _help else default
+        _help = self._help_format_env_vars(_help, env_var_names)
         return _help.replace('%', '%%') if issubclass(type(self._root_parser), ArgumentParser) else _help
 
     def _is_field_suppressed(self, field_info: FieldInfo) -> bool:
@@ -1468,11 +1565,11 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
     def _update_alias_path_only_default(
         self, arg_name: str, value: Any, field_info: FieldInfo, alias_path_only_defaults: dict[str, Any]
     ) -> list[Any] | dict[str, Any]:
-        alias_path: AliasPath = [
+        alias_path: AliasPath = next(
             alias if isinstance(alias, AliasPath) else cast(AliasPath, alias.choices[0])
             for alias in (field_info.alias, field_info.validation_alias)
             if isinstance(alias, (AliasPath, AliasChoices))
-        ][0]
+        )
 
         alias_nested_paths: list[str] = alias_path.path[1:-1]  # type: ignore
         if not alias_nested_paths:
@@ -1507,9 +1604,8 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
                     values = [','.join(f'{v}' for v in json.loads(value))]
                 elif list_style == 'argparse':
                     values = [f'{v}' for v in json.loads(value)]
-            elif isinstance(model_default, dict):
-                if dict_style == 'env':
-                    values = [f'{k}={v}' for k, v in json.loads(value).items()]
+            elif isinstance(model_default, dict) and dict_style == 'env':
+                values = [f'{k}={v}' for k, v in json.loads(value).items()]
         return values
 
     @staticmethod
@@ -1573,7 +1669,7 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
             )
 
             if arg.is_alias_path_only:
-                # For alias path only, we wont know the complete value until we've finished parsing the entire class. In
+                # For alias path only, we won't know the complete value until we've finished parsing the entire class. In
                 # this case, insert value as a non-string reference pointing to the relevant alias_path_only_defaults
                 # entry and convert into completed string value later.
                 value = self._update_alias_path_only_default(arg_name, value, field_info, alias_path_only_defaults)
@@ -1588,12 +1684,14 @@ class CliSettingsSource(EnvSettingsSource, Generic[T]):
             if arg.kwargs.get('action') == BooleanOptionalAction and model_default is False and flag_chars == '--':
                 flag_chars += 'no-'
 
-            for value in self._coerce_value_styles(model_default, value, list_style=list_style, dict_style=dict_style):
+            for coerced_value in self._coerce_value_styles(
+                model_default, value, list_style=list_style, dict_style=dict_style
+            ):
                 optional_args.append(f'{flag_chars}{arg_name}')
 
                 # If implicit bool flag, do not add a value
                 if arg.kwargs.get('action') not in (BooleanOptionalAction, 'store_true', 'store_false'):
-                    optional_args.append(value)
+                    optional_args.append(coerced_value)
 
         return {
             'optional': [json.dumps(value) if not isinstance(value, str) else value for value in optional_args],
