@@ -8,3 +8,5 @@ __pycache__/
 *.py[cod]
 error.txt
 streamlit_app/.streamlit/secrets.toml
+streamlit_app/.venv/
+.venv/
