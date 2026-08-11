@@ -93,3 +93,16 @@ async def request_all_document_validation(
     return result
 
 
+@router.get("/me", response_model=List[DocumentResponse], status_code=status.HTTP_200_OK)
+async def list_my_documents(
+    service: DocumentService = Depends(get_document_service),
+    current_student: Student = Depends(get_current_student),
+):
+    """
+    Secured Student Endpoint: Lists all documents uploaded against the
+    current student's application, including validation status.
+    """
+    if current_student.application_id is None:
+        raise HTTPException(status_code=404, detail="No application found for this student.")
+
+    return await service.list_application_documents(current_student.application_id)
