@@ -12,14 +12,22 @@ jobs:
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      FILEBASE_ACCESS_KEY: ${{ secrets.FILEBASE_ACCESS_KEY }}
+      FILEBASE_SECRET_KEY: ${{ secrets.FILEBASE_SECRET_KEY }}
+      FILEBASE_BUCKET_NAME: ${{ secrets.FILEBASE_BUCKET_NAME }}
+      GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+      SMTP_KEY: ${{ secrets.SMTP_KEY }}
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+      SENDER_NAME: ${{ secrets.SENDER_NAME }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"   # used to make the project
 
