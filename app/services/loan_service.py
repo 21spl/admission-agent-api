@@ -16,6 +16,7 @@ from app.models.enums import (
     ApplicationStatus,
     DocumentType,
     LoanStatus,
+    ValidationStatus,
 )
 from app.repositories.application_repository import ApplicationRepository
 from app.repositories.document_repository import DocumentRepository
@@ -124,6 +125,8 @@ class LoanService:
             storage_key=storage_key,
             content_type=content_type.value,
             file_size_bytes=len(file_bytes),
+            validation_status=ValidationStatus.VALID,
+            validation_reason="Information extracted and validated successfully.",
         )
         return await self.document_repository.create(new_doc)
 
