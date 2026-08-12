@@ -1,7 +1,8 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.config import initialize_ai_environment
 from app.ai.workflows.document_validation_workflow import DocumentValidationWorkflow
 from app.core.dependencies import (
@@ -13,7 +14,8 @@ from app.core.factories import (
     get_document_service,
     get_student_repository,
 )
-from app.models.domain import Student
+from app.database import get_db
+from app.models.domain import Student, Application
 from app.models.enums import AllowedFileType, DocumentType
 from app.repositories import application_repository, student_repository
 from app.schemas.document import DocumentResponse
@@ -106,16 +108,18 @@ async def request_all_document_validation(
     "/me", response_model=list[DocumentResponse], status_code=status.HTTP_200_OK
 )
 async def list_my_documents(
+    db: AsyncSession = Depends(get_db),
     service: DocumentService = Depends(get_document_service),
     current_student: Student = Depends(get_current_student),
 ):
-    """
-    Secured Student Endpoint: Lists all documents uploaded against the
-    current student's application, including validation status.
-    """
-    if current_student.application is None:
+    result = await db.execute(
+        select(Application).where(Application.student_id == current_student.id)
+    )
+    application = result.scalar_one_or_none()
+
+    if application is None:
         raise HTTPException(
             status_code=404, detail="No application found for this student."
         )
 
-    return await service.list_application_documents(current_student.application.id)
+    return await service.list_application_documents(application.id)
