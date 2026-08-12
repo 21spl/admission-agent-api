@@ -16,7 +16,7 @@ except APIError as e:
 
 if application is None:
     st.info("You haven't started your application yet.")
-    st.page_link("pages/2_Application.py", label="Start Application", icon="📝")
+    st.page_link("app_pages/application.py", label="Start Application", icon="📝")
 else:
     col1, col2 = st.columns(2)
     with col1:
@@ -27,8 +27,8 @@ else:
 
     st.divider()
     st.markdown("### Quick Links")
-    st.page_link("pages/2_Application.py", label="View / Edit Application", icon="📝")
-    st.page_link("pages/3_Documents.py", label="Upload Documents", icon="📄")
-    st.page_link("pages/4_Offers.py", label="View Offers", icon="🎓")
-    st.page_link("pages/5_Loan.py", label="Loan Application", icon="💰")
-    st.page_link("pages/6_Support.py", label="Get Support", icon="💬")
+    st.page_link("app_pages/application.py", label="View / Edit Application", icon="📝")
+    st.page_link("app_pages/documents.py", label="Upload Documents", icon="📄")
+    st.page_link("app_pages/offers.py", label="View Offers", icon="🎓")
+    st.page_link("app_pages/loan.py", label="Loan Application", icon="💰")
+    st.page_link("app_pages/support.py", label="Get Support", icon="💬")
