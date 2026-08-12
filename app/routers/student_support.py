@@ -104,19 +104,27 @@ async def _agent_event_generator(agent, user_msg: str, chat_history: list):
 # ============================= AUTHENTICATED (JWT, full orchestrator) =============================
 
 
+from sqlalchemy import select
+from app.models.domain import Application  
+
 @router.post("/chat/stream")
 async def authenticated_chat_stream(
     payload: StudentSupportChatRequest,
     current_student=Depends(get_current_student),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
-    if current_student.application.id is None:
+    result = await db.execute(
+        select(Application).where(Application.student_id == current_student.id)
+    )
+    application = result.scalar_one_or_none()
+
+    if application is None:
         return StreamingResponse(
             _static_message_stream(NO_APPLICATION_MESSAGE),
             media_type="text/event-stream",
         )
 
-    workflow = build_authenticated_support_workflow(db, current_student.application.id)
+    workflow = build_authenticated_support_workflow(db, application.id)
     chat_history = _to_chat_history(payload.history)
 
     return StreamingResponse(
