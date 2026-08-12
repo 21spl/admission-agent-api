@@ -110,13 +110,13 @@ async def authenticated_chat_stream(
     current_student=Depends(get_current_student),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
-    if current_student.application_id is None:
+    if current_student.application.id is None:
         return StreamingResponse(
             _static_message_stream(NO_APPLICATION_MESSAGE),
             media_type="text/event-stream",
         )
 
-    workflow = build_authenticated_support_workflow(db, current_student.application_id)
+    workflow = build_authenticated_support_workflow(db, current_student.application.id)
     chat_history = _to_chat_history(payload.history)
 
     return StreamingResponse(
