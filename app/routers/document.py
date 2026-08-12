@@ -113,9 +113,9 @@ async def list_my_documents(
     Secured Student Endpoint: Lists all documents uploaded against the
     current student's application, including validation status.
     """
-    if current_student.application_id is None:
+    if current_student.application is None:
         raise HTTPException(
             status_code=404, detail="No application found for this student."
         )
 
-    return await service.list_application_documents(current_student.application_id)
+    return await service.list_application_documents(current_student.application.id)
