@@ -57,3 +57,9 @@ async def system_health_check(db: AsyncSession = Depends(get_db)):
         "environment": settings.ENVIRONMENT,
         "database_status": db_status,
     }
+
+
+
+@app.get("/healthz", status_code=200)
+async def healthz():
+    return {"status": "ok"}
