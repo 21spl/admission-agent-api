@@ -15,3 +15,7 @@ def upload_document(
 
 def request_validation(application_id: str) -> dict:
     return client.post(f"/documents/applications/{application_id}/documents/validate")
+
+
+def list_my_documents() -> list[dict]:
+    return client.get("/documents/me")

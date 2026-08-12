@@ -18,7 +18,7 @@ except APIError as e:
 
 if not application:
     st.warning("You need to submit your application before uploading documents.")
-    st.page_link("pages/2_Application.py", label="Go to Application", icon="📝")
+    st.page_link("app_pages/application.py", label="Go to Application", icon="📝")
     st.stop()
 
 tab_upload, tab_status = st.tabs(["Upload", "Verification Status"])
