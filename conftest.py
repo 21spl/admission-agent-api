@@ -3,11 +3,11 @@ Shared test fixtures. Every test gets a real async DB session wrapped in
 a transaction that is rolled back at the end — so tests run against the
 actual dev Neon database, but never leave data behind.
 """
-
+import uuid
+from datetime import date
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
 from app.core.config import settings
 from app.core.security import hash_password
 from app.database import get_db
@@ -62,9 +62,6 @@ async def client(db_session):
     app.dependency_overrides.clear()
 
 
-# conftest.py — add this alongside db_session and client
-import uuid
-from datetime import date
 
 
 @pytest_asyncio.fixture

@@ -121,43 +121,6 @@ async def test_process_student_decision_raises_404_when_offer_belongs_to_another
 
 
 @pytest.mark.asyncio
-async def test_process_student_decision_raises_404_when_offer_belongs_to_another_student(
-    db_session, test_student, test_application, test_branch
-):
-    from datetime import date
-
-    from app.core.factories import get_student_service
-    from app.schemas.application import ApplicationCreateRequest, PreferenceEntry
-
-    student_service = get_student_service(db_session)
-    application_service = get_application_service(db_session)
-
-    other_student = await student_service.create_new_student(
-        name="Other Student",
-        email=f"other_{uuid.uuid4().hex[:8]}@example.com",
-        password="Pass123!",
-        phone=None,
-        date_of_birth=date(2003, 4, 12),
-    )
-    other_application = await application_service.create_student_application(
-        other_student,
-        ApplicationCreateRequest(
-            total_marks=70.0,
-            preferences=[PreferenceEntry(branch_id=test_branch.id, preference_order=1)],
-        ),
-    )
-
-    offer_service = get_offer_service(db_session)
-    offer = await _create_offer(db_session, other_application.id, test_branch.id)
-
-    with pytest.raises(HTTPException) as exc_info:
-        await offer_service.process_student_decision(
-            test_student, offer.id, OfferDecisionRequest(accept=True)
-        )
-    assert exc_info.value.status_code == 404
-
-
-@pytest.mark.asyncio
 async def test_process_student_decision_raises_409_when_already_resolved(
     db_session, test_student, test_application, test_branch
 ):

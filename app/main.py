@@ -1,7 +1,7 @@
+import logging
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.config import settings
 from app.database import get_db
 from app.routers import (
@@ -19,7 +19,7 @@ from app.routers import (
 )
 
 app = FastAPI(title=settings.PROJECT_NAME)
-import logging
+
 
 logger = logging.getLogger(__name__)
 
