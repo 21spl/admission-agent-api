@@ -38,13 +38,14 @@ FastAPI (async), SQLAlchemy 2.0 (async), Alembic, Pydantic v2, asyncpg
 
 ## Project Structure
 
+```bash
 admission-agent-api/ 
 ├── app/                # FastAPI backend
 ├── streamlit_app/       # Streamlit frontend
 ├── alembic/             # DB migrations
 ├── tests/               # pytest suite (unit + integration)
 ├── Dockerfile
-
+```
 
 ## Deployment
 Backend: Dockerized, deployed on Render (Ohio/us-east region, matching Neon).
