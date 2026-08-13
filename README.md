@@ -8,14 +8,24 @@ Handles the end-to-end admissions lifecycle — application submission, document
 
 ## Tech Stack
 
-**Backend:** FastAPI (async), SQLAlchemy 2.0 (async), Alembic, Pydantic v2, asyncpg
+**Backend:** 
+FastAPI (async), SQLAlchemy 2.0 (async), Alembic, Pydantic v2, asyncpg
+
 **Database:** Neon PostgreSQL + pgvector
+
 **AI / RAG:** LlamaIndex (multi-agent Workflows), Google Gemini (LLM + embeddings)
+
+
 **Storage:** Filebase (S3-compatible)
+
 **Email:** Brevo REST API
+
 **Auth:** JWT (PyJWT) + passlib/bcrypt, RBAC
+
 **Frontend:** Streamlit
+
 **Testing:** pytest, httpx AsyncClient, isolated Neon branch per CI run
+
 **CI/CD:** GitHub Actions → Render (backend, Docker) + Streamlit Community Cloud (frontend)
 
 ## Architecture Highlights
@@ -28,7 +38,7 @@ Handles the end-to-end admissions lifecycle — application submission, document
 
 ## Project Structure
 
-admission-agent-api/
+admission-agent-api/ 
 ├── app/                # FastAPI backend
 ├── streamlit_app/       # Streamlit frontend
 ├── alembic/             # DB migrations
