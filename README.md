@@ -33,17 +33,12 @@ shortlisting — behind a role-based, JWT-secured API.
 
 ## Architecture Highlights
 
-- **Layered design** — strict repository → service → router separation; no raw 
-  queries bypassing repositories.
-- **Multi-agent RAG pipeline** for document validation and applicant Q&A, 
-  orchestrated with LlamaIndex AgentWorkflow. Includes a public counsellor agent 
-  and an authenticated front-desk agent routing to four domain specialists.
+- **Layered design** — repository → service → router separation; 
 - **Gale-Shapley based shortlisting algorithm** for stable applicant-seat matching 
   across multiple counselling rounds.
-- **pgvector** chosen over a standalone vector DB to keep applicant data and 
-  embeddings in one transactional store.
-- **Security-hardened**: a privilege escalation vulnerability was discovered and 
-  patched during development — see [`security.md`](docs/security.md).
+- **Document validation** isn't fully automated. Al handles the clear cases, but gray-zone documents get routed to a **human-in-the-loop review**, where an admin makes the final call. Al assists; it doesn't decide unilaterally.
+- Student support runs on **multi-agent orchestration** - service methods are wrapped as **DB query tools** for personalized queries (status, application details), while policy-based questions are handled through RAG. The agents route to the right tool depending on what's actually being asked.
+- **pgvector** chosen over a standalone vector DB to keep applicant data and embeddings in one transactional store.
 - **Ethical scoping**: eligibility/rank prediction was deliberately excluded from 
   an official admissions system — predictive scoring on individual applicants 
   raises fairness and accountability concerns unsuitable for a real institutional 
